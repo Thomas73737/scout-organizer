@@ -1,22 +1,33 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: San George Scouts API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: Auth
+    description: Browser authentication endpoints
+  - name: Users
+    description: User management
+  - name: Attendance
+    description: Attendance tracking
+  - name: Announcements
+    description: Group announcements
+  - name: Posts
+    description: Community posts and files
+  - name: Storage
+    description: File upload and serving
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,13 +35,650 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /auth/user:
+    get:
+      tags: [Auth]
+      operationId: getCurrentAuthUser
+      summary: Get the currently authenticated user
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '200':
+          description: Auth status resolved successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthUserEnvelope'
+
+  /login:
+    get:
+      tags: [Auth]
+      operationId: beginBrowserLogin
+      summary: Start the browser OIDC login flow
+      parameters:
+        - name: returnTo
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to the OIDC authorization endpoint.
+
+  /callback:
+    get:
+      tags: [Auth]
+      operationId: handleBrowserLoginCallback
+      summary: Complete the browser OIDC login flow
+      parameters:
+        - name: code
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: iss
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uri
+      responses:
+        '302':
+          description: Redirect on success or failure.
+
+  /logout:
+    get:
+      tags: [Auth]
+      operationId: logoutBrowserSession
+      summary: Clear the session and begin OIDC logout
+      parameters:
+        - $ref: '#/components/parameters/AuthorizationSessionHeader'
+        - $ref: '#/components/parameters/SessionCookie'
+      responses:
+        '302':
+          description: Redirect to the OIDC provider logout URL.
+
+  /users:
+    get:
+      tags: [Users]
+      operationId: listUsers
+      summary: List all registered users (leader only)
+      responses:
+        '200':
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ScoutUser'
+
+  /users/me:
+    get:
+      tags: [Users]
+      operationId: getMyProfile
+      summary: Get current user profile with role
+      responses:
+        '200':
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoutUser'
+
+  /users/{userId}/role:
+    patch:
+      tags: [Users]
+      operationId: updateUserRole
+      summary: Update a user's role (leader only)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserRoleUpdate'
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoutUser'
+
+  /users/stats:
+    get:
+      tags: [Users]
+      operationId: getUserStats
+      summary: Get dashboard stats (total scouts, total leaders)
+      responses:
+        '200':
+          description: User statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserStats'
+
+  /attendance/sessions:
+    get:
+      tags: [Attendance]
+      operationId: listAttendanceSessions
+      summary: List all attendance sessions
+      responses:
+        '200':
+          description: List of sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AttendanceSession'
+    post:
+      tags: [Attendance]
+      operationId: createAttendanceSession
+      summary: Create a new attendance session (leader only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttendanceSessionInput'
+      responses:
+        '201':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceSession'
+
+  /attendance/sessions/{sessionId}:
+    get:
+      tags: [Attendance]
+      operationId: getAttendanceSession
+      summary: Get a session with all scout attendance records
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Session detail with records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceSessionDetail'
+
+  /attendance/sessions/{sessionId}/records:
+    post:
+      tags: [Attendance]
+      operationId: submitAttendanceRecords
+      summary: Submit attendance records for a session (leader only)
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AttendanceRecordsBatch'
+      responses:
+        '200':
+          description: Records saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceSessionDetail'
+
+  /attendance/my-summary:
+    get:
+      tags: [Attendance]
+      operationId: getMyAttendanceSummary
+      summary: Get the current scout's attendance summary
+      responses:
+        '200':
+          description: My attendance summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceSummary'
+
+  /announcements:
+    get:
+      tags: [Announcements]
+      operationId: listAnnouncements
+      summary: List all announcements (newest first)
+      responses:
+        '200':
+          description: List of announcements
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Announcement'
+    post:
+      tags: [Announcements]
+      operationId: createAnnouncement
+      summary: Create an announcement (leader only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnnouncementInput'
+      responses:
+        '201':
+          description: Announcement created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Announcement'
+
+  /announcements/{announcementId}:
+    delete:
+      tags: [Announcements]
+      operationId: deleteAnnouncement
+      summary: Delete an announcement (leader only)
+      parameters:
+        - name: announcementId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteSuccess'
+
+  /posts:
+    get:
+      tags: [Posts]
+      operationId: listPosts
+      summary: List all posts (newest first)
+      responses:
+        '200':
+          description: List of posts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Post'
+    post:
+      tags: [Posts]
+      operationId: createPost
+      summary: Create a post (any authenticated user)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PostInput'
+      responses:
+        '201':
+          description: Post created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+
+  /posts/{postId}:
+    delete:
+      tags: [Posts]
+      operationId: deletePost
+      summary: Delete a post (leader can delete any; scout can delete own)
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteSuccess'
+
+  /storage/uploads/request-url:
+    post:
+      tags: [Storage]
+      operationId: requestUploadUrl
+      summary: Request a presigned upload URL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadUrlRequest'
+      responses:
+        '200':
+          description: Presigned upload URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadUrlResponse'
+
+  /storage/objects/{objectPath}:
+    get:
+      tags: [Storage]
+      operationId: getObject
+      summary: Serve an uploaded object
+      parameters:
+        - name: objectPath
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Object content
+
 components:
+  parameters:
+    AuthorizationSessionHeader:
+      name: Authorization
+      in: header
+      required: false
+      schema:
+        type: string
+    SessionCookie:
+      name: sid
+      in: cookie
+      required: false
+      schema:
+        type: string
+
   schemas:
     HealthStatus:
       type: object
+      required: [status]
       properties:
         status:
           type: string
-      required:
-        - status
 
+    AuthUser:
+      type: object
+      required: [id, email, firstName, lastName, profileImageUrl]
+      properties:
+        id:
+          type: string
+        email:
+          type: ["string", "null"]
+          format: email
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        profileImageUrl:
+          type: ["string", "null"]
+
+    AuthUserEnvelope:
+      type: object
+      required: [user]
+      properties:
+        user:
+          oneOf:
+            - $ref: '#/components/schemas/AuthUser'
+            - type: 'null'
+
+    ScoutUser:
+      type: object
+      required: [id, replitId, firstName, lastName, email, role, createdAt]
+      properties:
+        id:
+          type: integer
+        replitId:
+          type: string
+        firstName:
+          type: ["string", "null"]
+        lastName:
+          type: ["string", "null"]
+        email:
+          type: ["string", "null"]
+        profileImageUrl:
+          type: ["string", "null"]
+        role:
+          type: string
+          enum: [scout, leader]
+        createdAt:
+          type: string
+          format: date-time
+
+    UserRoleUpdate:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [scout, leader]
+
+    UserStats:
+      type: object
+      required: [totalScouts, totalLeaders, totalMembers]
+      properties:
+        totalScouts:
+          type: integer
+        totalLeaders:
+          type: integer
+        totalMembers:
+          type: integer
+
+    AttendanceSession:
+      type: object
+      required: [id, title, sessionDate, createdAt, attendedCount, totalCount]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        sessionDate:
+          type: string
+          format: date-time
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        attendedCount:
+          type: integer
+        totalCount:
+          type: integer
+
+    AttendanceSessionInput:
+      type: object
+      required: [title, sessionDate]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        sessionDate:
+          type: string
+          format: date-time
+        notes:
+          type: string
+
+    AttendanceRecord:
+      type: object
+      required: [userId, scoutName, status]
+      properties:
+        userId:
+          type: integer
+        scoutName:
+          type: ["string", "null"]
+        profileImageUrl:
+          type: ["string", "null"]
+        status:
+          type: string
+          enum: [present, absent]
+
+    AttendanceSessionDetail:
+      type: object
+      required: [id, title, sessionDate, createdAt, records]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        sessionDate:
+          type: string
+          format: date-time
+        notes:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttendanceRecord'
+
+    AttendanceRecordItem:
+      type: object
+      required: [userId, status]
+      properties:
+        userId:
+          type: integer
+        status:
+          type: string
+          enum: [present, absent]
+
+    AttendanceRecordsBatch:
+      type: object
+      required: [records]
+      properties:
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/AttendanceRecordItem'
+
+    AttendanceSummary:
+      type: object
+      required: [totalSessions, attended, absent, rate]
+      properties:
+        totalSessions:
+          type: integer
+        attended:
+          type: integer
+        absent:
+          type: integer
+        rate:
+          type: number
+
+    Announcement:
+      type: object
+      required: [id, title, content, createdAt, authorName]
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        authorName:
+          type: ["string", "null"]
+        authorImageUrl:
+          type: ["string", "null"]
+
+    AnnouncementInput:
+      type: object
+      required: [title, content]
+      properties:
+        title:
+          type: string
+          minLength: 1
+        content:
+          type: string
+          minLength: 1
+
+    Post:
+      type: object
+      required: [id, content, createdAt, authorId, authorName]
+      properties:
+        id:
+          type: integer
+        content:
+          type: string
+        fileUrl:
+          type: ["string", "null"]
+        fileName:
+          type: ["string", "null"]
+        fileType:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+        authorId:
+          type: integer
+        authorName:
+          type: ["string", "null"]
+        authorRole:
+          type: string
+        authorImageUrl:
+          type: ["string", "null"]
+
+    PostInput:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
+        fileUrl:
+          type: string
+        fileName:
+          type: string
+        fileType:
+          type: string
+
+    DeleteSuccess:
+      type: object
+      required: [success]
+      properties:
+        success:
+          type: boolean
+
+    UploadUrlRequest:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name:
+          type: string
+        size:
+          type: integer
+        contentType:
+          type: string
+
+    UploadUrlResponse:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL:
+          type: string
+        objectPath:
+          type: string
