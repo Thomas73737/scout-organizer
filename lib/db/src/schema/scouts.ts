@@ -1,71 +1,113 @@
-import { pgTable, text, serial, timestamp, integer, pgEnum } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod/v4";
-import { usersTable } from "./auth";
+import mongoose from "mongoose";
 
-export const roleEnum = pgEnum("role", ["scout", "leader"]);
+export const roleEnum = ["scout", "leader"] as const;
 
-export const scoutProfilesTable = pgTable("scout_profiles", {
-  id: serial("id").primaryKey(),
-  userId: text("user_id").notNull().unique().references(() => usersTable.id, { onDelete: "cascade" }),
-  role: roleEnum("role").notNull().default("scout"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+const scoutProfileSchema = new mongoose.Schema({
+  id: { type: String, unique: true, sparse: true },
+  userId: { type: String, required: true, unique: true },
+  role: { type: String, default: "scout", enum: roleEnum },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
 });
 
-export const insertScoutProfileSchema = createInsertSchema(scoutProfilesTable).omit({ id: true, createdAt: true, updatedAt: true });
-export type InsertScoutProfile = z.infer<typeof insertScoutProfileSchema>;
-export type ScoutProfile = typeof scoutProfilesTable.$inferSelect;
-
-export const attendanceSessionsTable = pgTable("attendance_sessions", {
-  id: serial("id").primaryKey(),
-  title: text("title").notNull(),
-  sessionDate: timestamp("session_date", { withTimezone: true }).notNull(),
-  notes: text("notes"),
-  createdByUserId: text("created_by_user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+const attendanceSessionSchema = new mongoose.Schema({
+  id: { type: String, unique: true, sparse: true },
+  title: { type: String, required: true },
+  sessionDate: { type: Date, required: true },
+  notes: String,
+  createdByUserId: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now },
 });
 
-export const insertAttendanceSessionSchema = createInsertSchema(attendanceSessionsTable).omit({ id: true, createdAt: true });
-export type InsertAttendanceSession = z.infer<typeof insertAttendanceSessionSchema>;
-export type AttendanceSession = typeof attendanceSessionsTable.$inferSelect;
+const attendanceStatusEnum = ["present", "absent"] as const;
 
-export const attendanceStatusEnum = pgEnum("attendance_status", ["present", "absent"]);
-
-export const attendanceRecordsTable = pgTable("attendance_records", {
-  id: serial("id").primaryKey(),
-  sessionId: integer("session_id").notNull().references(() => attendanceSessionsTable.id, { onDelete: "cascade" }),
-  userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
-  status: attendanceStatusEnum("status").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+const attendanceRecordSchema = new mongoose.Schema({
+  id: { type: String, unique: true, sparse: true },
+  sessionId: { type: String, required: true },
+  userId: { type: String, required: true },
+  status: { type: String, required: true, enum: attendanceStatusEnum },
+  createdAt: { type: Date, default: Date.now },
 });
 
-export const insertAttendanceRecordSchema = createInsertSchema(attendanceRecordsTable).omit({ id: true, createdAt: true });
-export type InsertAttendanceRecord = z.infer<typeof insertAttendanceRecordSchema>;
-export type AttendanceRecord = typeof attendanceRecordsTable.$inferSelect;
-
-export const announcementsTable = pgTable("announcements", {
-  id: serial("id").primaryKey(),
-  title: text("title").notNull(),
-  content: text("content").notNull(),
-  authorUserId: text("author_user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+const announcementSchema = new mongoose.Schema({
+  id: { type: String, unique: true, sparse: true },
+  title: { type: String, required: true },
+  content: { type: String, required: true },
+  authorUserId: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now },
 });
 
-export const insertAnnouncementSchema = createInsertSchema(announcementsTable).omit({ id: true, createdAt: true });
-export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
-export type Announcement = typeof announcementsTable.$inferSelect;
-
-export const postsTable = pgTable("posts", {
-  id: serial("id").primaryKey(),
-  content: text("content").notNull(),
-  fileUrl: text("file_url"),
-  fileName: text("file_name"),
-  fileType: text("file_type"),
-  authorUserId: text("author_user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+const postSchema = new mongoose.Schema({
+  id: { type: String, unique: true, sparse: true },
+  content: { type: String, required: true },
+  fileUrl: String,
+  fileName: String,
+  fileType: String,
+  authorUserId: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now },
 });
 
-export const insertPostSchema = createInsertSchema(postsTable).omit({ id: true, createdAt: true });
-export type InsertPost = z.infer<typeof insertPostSchema>;
-export type Post = typeof postsTable.$inferSelect;
+export const ScoutProfileModel = mongoose.model("ScoutProfile", scoutProfileSchema);
+export const AttendanceSessionModel = mongoose.model("AttendanceSession", attendanceSessionSchema);
+export const AttendanceRecordModel = mongoose.model("AttendanceRecord", attendanceRecordSchema);
+export const AnnouncementModel = mongoose.model("Announcement", announcementSchema);
+export const PostModel = mongoose.model("Post", postSchema);
+
+// Types
+export type ScoutProfile = {
+  _id?: mongoose.Types.ObjectId;
+  id?: string;
+  userId: string;
+  role?: typeof roleEnum[number];
+  createdAt?: Date;
+  updatedAt?: Date;
+};
+
+export type InsertScoutProfile = Omit<ScoutProfile, "_id" | "createdAt" | "updatedAt">;
+
+export type AttendanceSession = {
+  _id?: mongoose.Types.ObjectId;
+  id?: string;
+  title: string;
+  sessionDate: Date;
+  notes?: string;
+  createdByUserId: string;
+  createdAt?: Date;
+};
+
+export type InsertAttendanceSession = Omit<AttendanceSession, "_id" | "createdAt">;
+
+export type AttendanceRecord = {
+  _id?: mongoose.Types.ObjectId;
+  id?: string;
+  sessionId: string;
+  userId: string;
+  status: typeof attendanceStatusEnum[number];
+  createdAt?: Date;
+};
+
+export type InsertAttendanceRecord = Omit<AttendanceRecord, "_id" | "createdAt">;
+
+export type Announcement = {
+  _id?: mongoose.Types.ObjectId;
+  id?: string;
+  title: string;
+  content: string;
+  authorUserId: string;
+  createdAt?: Date;
+};
+
+export type InsertAnnouncement = Omit<Announcement, "_id" | "createdAt">;
+
+export type Post = {
+  _id?: mongoose.Types.ObjectId;
+  id?: string;
+  content: string;
+  fileUrl?: string;
+  fileName?: string;
+  fileType?: string;
+  authorUserId: string;
+  createdAt?: Date;
+};
+
+export type InsertPost = Omit<Post, "_id" | "createdAt">;

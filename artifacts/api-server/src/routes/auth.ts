@@ -3,7 +3,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import {
   GetCurrentAuthUserResponse,
 } from "@workspace/api-zod";
-import { db, usersTable } from "@workspace/db";
+import { UserModel } from "@workspace/db";
 import {
   clearSession,
   getOidcConfig,
@@ -21,16 +21,26 @@ const OIDC_COOKIE_TTL = 10 * 60 * 1000;
 const router: IRouter = Router();
 
 function getOrigin(req: Request): string {
-  const proto = req.headers["x-forwarded-proto"] || "https";
+  if (process.env.NODE_ENV !== "production") {
+    const port = process.env.PORT ?? "5000";
+    return `http://localhost:${port}`;
+  }
+
+  const proto =
+    req.headers["x-forwarded-proto"] || req.protocol || "https";
   const host =
     req.headers["x-forwarded-host"] || req.headers["host"] || "localhost";
   return `${proto}://${host}`;
 }
 
+function isSecureCookie(): boolean {
+  return process.env.NODE_ENV === "production";
+}
+
 function setSessionCookie(res: Response, sid: string) {
   res.cookie(SESSION_COOKIE, sid, {
     httpOnly: true,
-    secure: true,
+    secure: isSecureCookie(),
     sameSite: "lax",
     path: "/",
     maxAge: SESSION_TTL,
@@ -40,7 +50,7 @@ function setSessionCookie(res: Response, sid: string) {
 function setOidcCookie(res: Response, name: string, value: string) {
   res.cookie(name, value, {
     httpOnly: true,
-    secure: true,
+    secure: isSecureCookie(),
     sameSite: "lax",
     path: "/",
     maxAge: OIDC_COOKIE_TTL,
@@ -57,25 +67,18 @@ function getSafeReturnTo(value: unknown): string {
 async function upsertUser(claims: Record<string, unknown>) {
   const userData = {
     id: claims.sub as string,
-    email: (claims.email as string) || null,
-    firstName: (claims.first_name as string) || null,
-    lastName: (claims.last_name as string) || null,
-    profileImageUrl: (claims.profile_image_url || claims.picture) as
-      | string
-      | null,
+    email: (claims.email as string) || undefined,
+    firstName: (claims.first_name as string) || undefined,
+    lastName: (claims.last_name as string) || undefined,
+    profileImageUrl: (claims.profile_image_url || claims.picture) as string | undefined,
+    updatedAt: new Date(),
   };
 
-  const [user] = await db
-    .insert(usersTable)
-    .values(userData)
-    .onConflictDoUpdate({
-      target: usersTable.id,
-      set: {
-        ...userData,
-        updatedAt: new Date(),
-      },
-    })
-    .returning();
+  const user = await UserModel.findOneAndUpdate(
+    { id: userData.id },
+    userData,
+    { upsert: true, new: true }
+  );
   return user;
 }
 

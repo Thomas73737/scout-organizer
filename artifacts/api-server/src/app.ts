@@ -14,7 +14,7 @@ app.use(
     serializers: {
       req(req) {
         return {
-          id: req.id,
+            id: req.id,
           method: req.method,
           url: req.url?.split("?")[0],
         };

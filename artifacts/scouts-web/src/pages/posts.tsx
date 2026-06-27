@@ -112,7 +112,7 @@ export default function Posts() {
     );
   };
 
-  const canDelete = (post: { authorId: number; authorRole: string }) => {
+  const canDelete = (post: any) => {
     if (profile?.role === "leader") return true;
     return post.authorId === profile?.id;
   };
@@ -122,8 +122,8 @@ export default function Posts() {
     return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
   };
 
-  const isFilePdf = (type: string | null) => type?.includes("pdf");
-  const isFilePpt = (type: string | null) =>
+  const isFilePdf = (type?: string | null) => type?.includes("pdf");
+  const isFilePpt = (type?: string | null) =>
     type?.includes("presentation") || type?.includes("powerpoint");
 
   return (

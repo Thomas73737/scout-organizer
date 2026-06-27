@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useListUsers, useUpdateUserRole, getListUsersQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +15,57 @@ export default function Admin() {
   const updateRoleMutation = useUpdateUserRole();
   const queryClient = useQueryClient();
   const { toast } = useToast();
+  const [requests, setRequests] = useState<Array<{
+    id: string;
+    name: string;
+    phone: string;
+    team: string;
+    status: string;
+    createdAt: string;
+  }>>([]);
+  const [requestsLoading, setRequestsLoading] = useState(true);
+  const [requestActionPending, setRequestActionPending] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchRequests = async () => {
+      setRequestsLoading(true);
+      try {
+        const response = await fetch("/api/access-requests");
+        if (!response.ok) {
+          throw new Error("Failed to load access requests");
+        }
+        const data = await response.json();
+        setRequests(data);
+      } catch (error) {
+        toast({ title: "Unable to load access requests", variant: "destructive" });
+      } finally {
+        setRequestsLoading(false);
+      }
+    };
+    fetchRequests();
+  }, [toast]);
+
+  const handleRequestAction = async (requestId: string, action: "approve" | "deny") => {
+    setRequestActionPending(requestId);
+    try {
+      const response = await fetch(`/api/access-requests/${requestId}/${action}`, {
+        method: "POST",
+      });
+      if (!response.ok) {
+        throw new Error("Failed to update request");
+      }
+      toast({ title: `Request ${action}ed successfully` });
+      setRequests((current) =>
+        current.map((request) =>
+          request.id === requestId ? { ...request, status: action === "approve" ? "approved" : "denied" } : request,
+        ),
+      );
+    } catch {
+      toast({ title: `Failed to ${action} request`, variant: "destructive" });
+    } finally {
+      setRequestActionPending(null);
+    }
+  };
 
   const handleRoleChange = (userId: string, role: "scout" | "leader") => {
     updateRoleMutation.mutate(
@@ -67,6 +119,55 @@ export default function Admin() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Pending Access Requests / طلبات الانضمام</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {requestsLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-14 w-full" />)}
+            </div>
+          ) : requests.length === 0 ? (
+            <p className="text-muted-foreground text-sm text-center py-6">No pending requests</p>
+          ) : (
+            <div className="space-y-3">
+              {requests.map((request) => (
+                <div key={request.id} className="rounded-lg border border-border p-4 bg-background">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-foreground">{request.name}</p>
+                      <p className="text-sm text-muted-foreground">{request.phone} • {request.team}</p>
+                    </div>
+                    <Badge variant={request.status === "pending" ? "secondary" : request.status === "approved" ? "default" : "destructive"}>
+                      {request.status}
+                    </Badge>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={request.status !== "pending" || requestActionPending === request.id}
+                      onClick={() => handleRequestAction(request.id, "approve")}
+                    >
+                      Approve
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={request.status !== "pending" || requestActionPending === request.id}
+                      onClick={() => handleRequestAction(request.id, "deny")}
+                    >
+                      Deny
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

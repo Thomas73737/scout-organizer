@@ -1,7 +1,5 @@
 import { Router } from "express";
-import { db } from "@workspace/db";
-import { usersTable, scoutProfilesTable, attendanceSessionsTable, attendanceRecordsTable } from "@workspace/db";
-import { eq, and, count, sql } from "drizzle-orm";
+import { AttendanceSessionModel, AttendanceRecordModel, ScoutProfileModel, UserModel } from "@workspace/db";
 import { CreateAttendanceSessionBody, SubmitAttendanceRecordsBody } from "@workspace/api-zod";
 
 const router = Router();

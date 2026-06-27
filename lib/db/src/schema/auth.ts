@@ -1,27 +1,41 @@
-import { sql } from "drizzle-orm";
-import { index, jsonb, pgTable, timestamp, varchar } from "drizzle-orm/pg-core";
+import mongoose from "mongoose";
+import { z } from "zod/v4";
 
-// (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
-export const sessionsTable = pgTable(
-  "sessions",
-  {
-    sid: varchar("sid").primaryKey(),
-    sess: jsonb("sess").notNull(),
-    expire: timestamp("expire").notNull(),
-  },
-  (table) => [index("IDX_session_expire").on(table.expire)],
-);
-
-// (IMPORTANT) This table is mandatory for Replit Auth, don't drop it.
-export const usersTable = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: varchar("email").unique(),
-  firstName: varchar("first_name"),
-  lastName: varchar("last_name"),
-  profileImageUrl: varchar("profile_image_url"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
+// Sessions schema
+const sessionSchema = new mongoose.Schema({
+  sid: { type: String, required: true, unique: true },
+  sess: { type: mongoose.Schema.Types.Mixed, required: true },
+  expire: { type: Date, required: true },
 });
 
-export type UpsertUser = typeof usersTable.$inferInsert;
-export type User = typeof usersTable.$inferSelect;
+// Users schema
+const userSchema = new mongoose.Schema({
+  id: { type: String, unique: true, sparse: true },
+  email: { type: String, unique: true, sparse: true },
+  firstName: String,
+  lastName: String,
+  phone: String,
+  team: String,
+  profileImageUrl: String,
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+
+export const SessionModel = mongoose.model("Session", sessionSchema);
+export const UserModel = mongoose.model("User", userSchema);
+
+// Types
+export type User = {
+  _id?: mongoose.Types.ObjectId;
+  id?: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  team?: string;
+  profileImageUrl?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+};
+
+export type UpsertUser = Omit<User, "_id" | "createdAt" | "updatedAt">;

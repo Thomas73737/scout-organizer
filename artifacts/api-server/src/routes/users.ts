@@ -1,40 +1,35 @@
 import { Router } from "express";
-import { db } from "@workspace/db";
-import { usersTable } from "@workspace/db";
-import { scoutProfilesTable } from "@workspace/db";
-import { eq, count } from "drizzle-orm";
+import { UserModel, ScoutProfileModel } from "@workspace/db";
 import { UpdateUserRoleBody } from "@workspace/api-zod";
+import { randomUUID } from "crypto";
 
 const router = Router();
 
 async function ensureProfile(userId: string) {
-  const existing = await db
-    .select()
-    .from(scoutProfilesTable)
-    .where(eq(scoutProfilesTable.userId, userId))
-    .limit(1);
-  if (existing.length === 0) {
-    await db.insert(scoutProfilesTable).values({ userId, role: "scout" });
+  const existing = await ScoutProfileModel.findOne({ userId });
+  if (!existing) {
+    await ScoutProfileModel.create({ id: randomUUID(), userId, role: "scout" });
   }
 }
 
 async function getUserWithRole(userId: string) {
-  const user = await db
-    .select({
-      id: scoutProfilesTable.id,
-      replitId: usersTable.id,
-      firstName: usersTable.firstName,
-      lastName: usersTable.lastName,
-      email: usersTable.email,
-      profileImageUrl: usersTable.profileImageUrl,
-      role: scoutProfilesTable.role,
-      createdAt: scoutProfilesTable.createdAt,
-    })
-    .from(usersTable)
-    .innerJoin(scoutProfilesTable, eq(scoutProfilesTable.userId, usersTable.id))
-    .where(eq(usersTable.id, userId))
-    .limit(1);
-  return user[0] || null;
+  const [user, profile] = await Promise.all([
+    UserModel.findOne({ id: userId }),
+    ScoutProfileModel.findOne({ userId }),
+  ]);
+
+  if (!user || !profile) return null;
+
+  return {
+    id: profile.id,
+    replitId: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    email: user.email,
+    profileImageUrl: user.profileImageUrl,
+    role: profile.role,
+    createdAt: profile.createdAt,
+  };
 }
 
 router.get("/users", async (req, res) => {
@@ -49,20 +44,22 @@ router.get("/users", async (req, res) => {
     return;
   }
 
-  const users = await db
-    .select({
-      id: scoutProfilesTable.id,
-      replitId: usersTable.id,
-      firstName: usersTable.firstName,
-      lastName: usersTable.lastName,
-      email: usersTable.email,
-      profileImageUrl: usersTable.profileImageUrl,
-      role: scoutProfilesTable.role,
-      createdAt: scoutProfilesTable.createdAt,
+  const profiles = await ScoutProfileModel.find().sort({ createdAt: -1 });
+  const users = await Promise.all(
+    profiles.map(async (profile) => {
+      const user = await UserModel.findOne({ id: profile.userId });
+      return {
+        id: profile.id,
+        replitId: user?.id,
+        firstName: user?.firstName,
+        lastName: user?.lastName,
+        email: user?.email,
+        profileImageUrl: user?.profileImageUrl,
+        role: profile.role,
+        createdAt: profile.createdAt,
+      };
     })
-    .from(usersTable)
-    .innerJoin(scoutProfilesTable, eq(scoutProfilesTable.userId, usersTable.id))
-    .orderBy(scoutProfilesTable.createdAt);
+  );
 
   res.json(users);
 });
@@ -87,20 +84,13 @@ router.get("/users/stats", async (req, res) => {
     return;
   }
 
-  const [scoutCount] = await db
-    .select({ count: count() })
-    .from(scoutProfilesTable)
-    .where(eq(scoutProfilesTable.role, "scout"));
-
-  const [leaderCount] = await db
-    .select({ count: count() })
-    .from(scoutProfilesTable)
-    .where(eq(scoutProfilesTable.role, "leader"));
+  const scoutCount = await ScoutProfileModel.countDocuments({ role: "scout" });
+  const leaderCount = await ScoutProfileModel.countDocuments({ role: "leader" });
 
   res.json({
-    totalScouts: Number(scoutCount?.count ?? 0),
-    totalLeaders: Number(leaderCount?.count ?? 0),
-    totalMembers: Number(scoutCount?.count ?? 0) + Number(leaderCount?.count ?? 0),
+    totalScouts: scoutCount,
+    totalLeaders: leaderCount,
+    totalMembers: scoutCount + leaderCount,
   });
 });
 
@@ -123,22 +113,18 @@ router.patch("/users/:userId/role", async (req, res) => {
   }
 
   const targetUserId = req.params.userId;
-  const targetUser = await db
-    .select()
-    .from(usersTable)
-    .where(eq(usersTable.id, targetUserId))
-    .limit(1);
+  const targetUser = await UserModel.findOne({ id: targetUserId });
 
-  if (targetUser.length === 0) {
+  if (!targetUser) {
     res.status(404).json({ error: "User not found" });
     return;
   }
 
   await ensureProfile(targetUserId);
-  await db
-    .update(scoutProfilesTable)
-    .set({ role: parsed.data.role })
-    .where(eq(scoutProfilesTable.userId, targetUserId));
+  await ScoutProfileModel.findOneAndUpdate(
+    { userId: targetUserId },
+    { role: parsed.data.role }
+  );
 
   const updated = await getUserWithRole(targetUserId);
   res.json(updated);
