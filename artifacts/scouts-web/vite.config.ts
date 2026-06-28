@@ -55,7 +55,7 @@ export default defineConfig(async ({ mode }) => {
     allowedHosts: "all",
     proxy: {
       "/api": {
-        target: "http://localhost:5000",
+        target: env.VITE_API_URL || "http://localhost:5000",
         changeOrigin: true,
         ws: true,
       },
@@ -68,6 +68,13 @@ export default defineConfig(async ({ mode }) => {
     port,
     host: "0.0.0.0",
     allowedHosts: "all",
+    proxy: {
+      "/api": {
+        target: env.VITE_API_URL || "http://localhost:5000",
+        changeOrigin: true,
+        ws: true,
+      },
+    },
   },
   };
 });

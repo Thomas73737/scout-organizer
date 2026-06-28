@@ -1,0 +1,30 @@
+services:
+  # Backend API Server
+  - type: web
+    name: scout-organizer-api
+    runtime: node
+    plan: free
+    nodeVersion: 18
+    buildCommand: pnpm install --frozen-lockfile && pnpm run build
+    startCommand: pnpm --filter @workspace/api-server run start
+    envVars:
+      - key: PORT
+        value: 5000
+      - key: DATABASE_URL
+        sync: false # Set this to your MongoDB Atlas connection string
+      - key: NODE_ENV
+        value: production
+
+  # Frontend Web App
+  - type: web
+    name: scout-organizer-web
+    runtime: node
+    plan: free
+    nodeVersion: 18
+    buildCommand: pnpm install --frozen-lockfile && pnpm --filter @workspace/scouts-web run build
+    startCommand: pnpm --filter @workspace/scouts-web run serve
+    envVars:
+      - key: VITE_PORT
+        value: 3000
+      - key: VITE_API_URL
+        sync: false # Will be set to the API service URL after deployment
