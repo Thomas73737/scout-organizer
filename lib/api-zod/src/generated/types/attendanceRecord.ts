@@ -8,7 +8,7 @@
 import type { AttendanceRecordStatus } from './attendanceRecordStatus';
 
 export interface AttendanceRecord {
-  userId: number;
+  userId: string;
   /** @nullable */
   scoutName: string | null;
   /** @nullable */

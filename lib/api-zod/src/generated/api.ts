@@ -70,13 +70,13 @@ export const LogoutBrowserSessionResponse = zod.void()
  * @summary List all registered users (leader only)
  */
 export const ListUsersResponseItem = zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "replitId": zod.string(),
   "firstName": zod.string().nullable(),
   "lastName": zod.string().nullable(),
   "email": zod.string().nullable(),
   "profileImageUrl": zod.string().nullish(),
-  "role": zod.enum(['scout', 'leader']),
+  "role": zod.enum(['scout', 'leader', 'developer']),
   "createdAt": zod.coerce.date()
 })
 export const ListUsersResponse = zod.array(ListUsersResponseItem)
@@ -86,13 +86,13 @@ export const ListUsersResponse = zod.array(ListUsersResponseItem)
  * @summary Get current user profile with role
  */
 export const GetMyProfileResponse = zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "replitId": zod.string(),
   "firstName": zod.string().nullable(),
   "lastName": zod.string().nullable(),
   "email": zod.string().nullable(),
   "profileImageUrl": zod.string().nullish(),
-  "role": zod.enum(['scout', 'leader']),
+  "role": zod.enum(['scout', 'leader', 'developer']),
   "createdAt": zod.coerce.date()
 })
 
@@ -105,17 +105,17 @@ export const UpdateUserRoleParams = zod.object({
 })
 
 export const UpdateUserRoleBody = zod.object({
-  "role": zod.enum(['scout', 'leader'])
+  "role": zod.enum(['scout', 'leader', 'developer'])
 })
 
 export const UpdateUserRoleResponse = zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "replitId": zod.string(),
   "firstName": zod.string().nullable(),
   "lastName": zod.string().nullable(),
   "email": zod.string().nullable(),
   "profileImageUrl": zod.string().nullish(),
-  "role": zod.enum(['scout', 'leader']),
+  "role": zod.enum(['scout', 'leader', 'developer']),
   "createdAt": zod.coerce.date()
 })
 
@@ -134,7 +134,7 @@ export const GetUserStatsResponse = zod.object({
  * @summary List all attendance sessions
  */
 export const ListAttendanceSessionsResponseItem = zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "title": zod.string(),
   "sessionDate": zod.coerce.date(),
   "notes": zod.string().nullish(),
@@ -158,7 +158,7 @@ export const CreateAttendanceSessionBody = zod.object({
 })
 
 export const CreateAttendanceSessionResponse = zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "title": zod.string(),
   "sessionDate": zod.coerce.date(),
   "notes": zod.string().nullish(),
@@ -176,13 +176,13 @@ export const GetAttendanceSessionParams = zod.object({
 })
 
 export const GetAttendanceSessionResponse = zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "title": zod.string(),
   "sessionDate": zod.coerce.date(),
   "notes": zod.string().nullish(),
   "createdAt": zod.coerce.date(),
   "records": zod.array(zod.object({
-  "userId": zod.number(),
+  "userId": zod.string(),
   "scoutName": zod.string().nullable(),
   "profileImageUrl": zod.string().nullish(),
   "status": zod.enum(['present', 'absent'])
@@ -199,19 +199,19 @@ export const SubmitAttendanceRecordsParams = zod.object({
 
 export const SubmitAttendanceRecordsBody = zod.object({
   "records": zod.array(zod.object({
-  "userId": zod.number(),
+  "userId": zod.string(),
   "status": zod.enum(['present', 'absent'])
 }))
 })
 
 export const SubmitAttendanceRecordsResponse = zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "title": zod.string(),
   "sessionDate": zod.coerce.date(),
   "notes": zod.string().nullish(),
   "createdAt": zod.coerce.date(),
   "records": zod.array(zod.object({
-  "userId": zod.number(),
+  "userId": zod.string(),
   "scoutName": zod.string().nullable(),
   "profileImageUrl": zod.string().nullish(),
   "status": zod.enum(['present', 'absent'])

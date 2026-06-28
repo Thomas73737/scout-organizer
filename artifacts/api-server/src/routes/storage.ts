@@ -1,5 +1,7 @@
 import { Router, type IRouter, type Request, type Response } from "express";
 import { Readable } from "stream";
+import * as fs from "fs";
+import * as path from "path";
 import {
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
@@ -9,6 +11,11 @@ import { ObjectPermission } from "../lib/objectAcl";
 
 const router: IRouter = Router();
 const objectStorageService = new ObjectStorageService();
+
+// Local storage directory for development
+const LOCAL_STORAGE_DIR = path.join(process.cwd(), "local-storage");
+const LOCAL_UPLOADS_DIR = path.join(LOCAL_STORAGE_DIR, "uploads");
+const IS_LOCAL_DEV = !process.env.REPLIT_DEPLOYMENT;
 
 /**
  * POST /storage/uploads/request-url
@@ -40,6 +47,45 @@ router.post("/storage/uploads/request-url", async (req: Request, res: Response) 
   } catch (error) {
     req.log.error({ err: error }, "Error generating upload URL");
     res.status(500).json({ error: "Failed to generate upload URL" });
+  }
+});
+
+/**
+ * PUT /storage/local-upload/:objectId
+ *
+ * Local development file upload endpoint.
+ * This is used when running locally without Replit's object storage.
+ */
+router.put("/storage/local-upload/:objectId", async (req: Request, res: Response) => {
+  if (!IS_LOCAL_DEV) {
+    res.status(403).json({ error: "Local upload only available in development" });
+    return;
+  }
+
+  try {
+    const objectId = req.params.objectId;
+    const filePath = path.join(LOCAL_UPLOADS_DIR, objectId);
+
+    // Ensure directory exists
+    if (!fs.existsSync(LOCAL_UPLOADS_DIR)) {
+      fs.mkdirSync(LOCAL_UPLOADS_DIR, { recursive: true });
+    }
+
+    // Save file
+    const fileStream = fs.createWriteStream(filePath);
+    req.pipe(fileStream);
+
+    fileStream.on('finish', () => {
+      res.json({ success: true, objectPath: `/objects/uploads/${objectId}` });
+    });
+
+    fileStream.on('error', (error) => {
+      req.log.error({ err: error }, "Error saving file");
+      res.status(500).json({ error: "Failed to save file" });
+    });
+  } catch (error) {
+    req.log.error({ err: error }, "Error in local upload");
+    res.status(500).json({ error: "Failed to upload file" });
   }
 });
 

@@ -8,7 +8,7 @@
 import type { ScoutUserRole } from './scoutUserRole';
 
 export interface ScoutUser {
-  id: number;
+  id: string;
   replitId: string;
   /** @nullable */
   firstName: string | null;

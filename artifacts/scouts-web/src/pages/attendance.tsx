@@ -32,7 +32,109 @@ const sessionSchema = z.object({
 });
 type SessionForm = z.infer<typeof sessionSchema>;
 
-function AttendanceSessionDetail({ sessionId, onClose }: { sessionId: number; onClose: () => void }) {
+function PatrolAttendanceView({ patrol, scouts, onClose }: { patrol: string; scouts: any[]; onClose: () => void }) {
+  const [selectedScouts, setSelectedScouts] = useState<Set<string>>(new Set());
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
+  const createMutation = useCreateAttendanceSession();
+  const submitMutation = useSubmitAttendanceRecords();
+  const queryClient = useQueryClient();
+
+  const toggleScout = (scoutId: string) => {
+    setSelectedScouts((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(scoutId)) {
+        newSet.delete(scoutId);
+      } else {
+        newSet.add(scoutId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSubmitAttendance = async () => {
+    setIsSubmitting(true);
+    try {
+      // Create a new attendance session for today
+      const sessionResponse = await createMutation.mutateAsync({
+        data: {
+          title: `${patrol} Patrol Attendance - ${new Date().toLocaleDateString("ar-EG")}`,
+          sessionDate: new Date().toISOString(),
+          notes: `Attendance for ${patrol} patrol`,
+        },
+      });
+
+      const session = sessionResponse;
+      
+      // Submit attendance records
+      const records = scouts.map((scout) => ({
+        userId: scout.replitId,
+        status: selectedScouts.has(scout.replitId) ? ("present" as const) : ("absent" as const),
+      }));
+
+      await submitMutation.mutateAsync({
+        sessionId: session.id,
+        data: { records },
+      });
+
+      queryClient.invalidateQueries({ queryKey: getListAttendanceSessionsQueryKey() });
+      toast({ title: "Attendance recorded successfully" });
+      onClose();
+    } catch (error) {
+      toast({ title: "Failed to record attendance", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (scouts.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        No scouts in this patrol yet
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="space-y-2 max-h-64 overflow-y-auto">
+        {scouts.map((scout) => (
+          <div
+            key={scout.id}
+            className={`flex items-center justify-between px-4 py-3 rounded-lg border transition-colors cursor-pointer ${
+              selectedScouts.has(scout.replitId)
+                ? "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800"
+                : "bg-background border-border"
+            }`}
+            onClick={() => toggleScout(scout.replitId)}
+          >
+            <span className="text-sm font-medium">
+              {scout.firstName} {scout.lastName}
+            </span>
+            {selectedScouts.has(scout.id) ? (
+              <CheckCircle className="h-5 w-5 text-green-600" />
+            ) : (
+              <XCircle className="h-5 w-5 text-muted-foreground" />
+            )}
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <Button variant="outline" onClick={onClose} disabled={isSubmitting}>
+          Cancel
+        </Button>
+        <Button
+          onClick={handleSubmitAttendance}
+          disabled={isSubmitting || selectedScouts.size === 0}
+        >
+          {isSubmitting ? "Recording..." : "Record Attendance / تسجيل الحضور"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function AttendanceSessionDetail({ sessionId, onClose }: { sessionId: string; onClose: () => void }) {
   const { data: session, isLoading } = useGetAttendanceSession(sessionId, {
     query: { enabled: !!sessionId, queryKey: getGetAttendanceSessionQueryKey(sessionId) },
   });
@@ -41,18 +143,18 @@ function AttendanceSessionDetail({ sessionId, onClose }: { sessionId: number; on
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: profile } = useGetMyProfile();
-  const isLeader = profile?.role === "leader";
+  const isLeader = profile?.role === "leader" || profile?.role === "developer";
 
-  const [attendance, setAttendance] = useState<Record<number, "present" | "absent">>({});
+  const [attendance, setAttendance] = useState<Record<string, "present" | "absent">>({});
 
-  const toggleStatus = (userId: number) => {
+  const toggleStatus = (userId: string) => {
     setAttendance((prev) => ({
       ...prev,
       [userId]: prev[userId] === "present" ? "absent" : "present",
     }));
   };
 
-  const getStatus = (userId: number, existingStatus?: string) => {
+  const getStatus = (userId: string, existingStatus?: string) => {
     if (userId in attendance) return attendance[userId];
     return (existingStatus as "present" | "absent") ?? "absent";
   };
@@ -60,8 +162,8 @@ function AttendanceSessionDetail({ sessionId, onClose }: { sessionId: number; on
   const handleSubmit = () => {
     const scouts = allUsers?.filter((u) => u.role === "scout") ?? [];
     const records = scouts.map((u) => ({
-      userId: u.id,
-      status: getStatus(u.id, session?.records?.find((r) => r.userId === u.id)?.status),
+      userId: u.replitId,
+      status: getStatus(u.replitId, session?.records?.find((r) => r.userId === u.replitId)?.status),
     }));
 
     submitMutation.mutate(
@@ -100,15 +202,15 @@ function AttendanceSessionDetail({ sessionId, onClose }: { sessionId: number; on
           <p className="text-muted-foreground text-sm text-center py-4">No scouts registered yet</p>
         ) : (
           scouts.map((scout) => {
-            const existingRecord = session?.records?.find((r) => r.userId === scout.id);
-            const status = getStatus(scout.id, existingRecord?.status);
+            const existingRecord = session?.records?.find((r) => r.userId === scout.replitId);
+            const status = getStatus(scout.replitId, existingRecord?.status);
             return (
               <div
                 key={scout.id}
                 className={`flex items-center justify-between px-4 py-3 rounded-lg border transition-colors cursor-pointer ${
                   status === "present" ? "bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800" : "bg-background border-border"
                 }`}
-                onClick={() => isLeader && toggleStatus(scout.id)}
+                onClick={() => isLeader && toggleStatus(scout.replitId)}
                 data-testid={`attendance-scout-${scout.id}`}
               >
                 <span className="text-sm font-medium">
@@ -140,14 +242,29 @@ export default function Attendance() {
   const { data: profile } = useGetMyProfile();
   const { data: sessions, isLoading } = useListAttendanceSessions();
   const { data: mySummary } = useGetMyAttendanceSummary();
+  const { data: allUsers } = useListUsers();
   const createMutation = useCreateAttendanceSession();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [selectedPatrol, setSelectedPatrol] = useState<string | null>(null);
 
-  const isLeader = profile?.role === "leader";
+  const isLeader = profile?.role === "leader" || profile?.role === "developer";
+  const isAdmin = profile?.role === "leader" || profile?.role === "developer";
+
+  const patrols = ["صقر", "فهد", "ثعلب", "ذئب", "نمر", "نسر", "أسد", "غراب", "بلبل", "ديك", "خفاش", "غزال"];
+
+  const scoutsByPatrol = allUsers?.filter((u) => u.role === "scout" && u.patrol).reduce((acc, scout) => {
+    if (scout.patrol) {
+      if (!acc[scout.patrol]) {
+        acc[scout.patrol] = [];
+      }
+      acc[scout.patrol].push(scout);
+    }
+    return acc;
+  }, {} as Record<string, typeof allUsers>) || {};
 
   const form = useForm<SessionForm>({
     resolver: zodResolver(sessionSchema),
@@ -180,10 +297,10 @@ export default function Attendance() {
             Attendance / الحضور
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            {isLeader ? "Track and record attendance for all sessions" : "Your attendance record"}
+            {isAdmin ? "Track and record attendance by patrol" : "Your attendance record"}
           </p>
         </div>
-        {isLeader && (
+        {isAdmin && (
           <Button onClick={() => setCreateDialogOpen(true)} data-testid="button-new-session">
             <Plus className="h-4 w-4 mr-2" />
             New Session
@@ -191,8 +308,52 @@ export default function Attendance() {
         )}
       </div>
 
+      {/* Admin Patrol Selection View */}
+      {isAdmin && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {patrols.map((patrol) => {
+              const scoutsInPatrol = scoutsByPatrol[patrol] || [];
+              return (
+                <Card
+                  key={patrol}
+                  className="cursor-pointer hover:border-primary/50 transition-colors"
+                  onClick={() => setSelectedPatrol(patrol)}
+                >
+                  <CardContent className="py-6">
+                    <div className="text-center">
+                      <p className="text-lg font-bold text-foreground mb-1">{patrol}</p>
+                      <p className="text-sm text-muted-foreground">{scoutsInPatrol.length} scouts</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Scout Selection Dialog */}
+          {selectedPatrol && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center justify-between">
+                  <span>{selectedPatrol} Patrol / فرقة {selectedPatrol}</span>
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedPatrol(null)}>Close</Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <PatrolAttendanceView 
+                  patrol={selectedPatrol}
+                  scouts={scoutsByPatrol[selectedPatrol] || []}
+                  onClose={() => setSelectedPatrol(null)}
+                />
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
       {/* Scout Summary */}
-      {!isLeader && mySummary && (
+      {!isAdmin && mySummary && (
         <Card data-testid="attendance-summary">
           <CardHeader>
             <CardTitle className="text-base">My Attendance / حضوري</CardTitle>
@@ -221,47 +382,51 @@ export default function Attendance() {
         </Card>
       )}
 
-      {/* Sessions List */}
-      {isLoading ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full" />)}
-        </div>
-      ) : sessions?.length === 0 ? (
-        <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
-            No sessions yet
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {sessions?.map((session) => (
-            <Card
-              key={session.id}
-              className="cursor-pointer hover:border-primary/50 transition-colors"
-              onClick={() => setSelectedSessionId(session.id)}
-              data-testid={`session-card-${session.id}`}
-            >
-              <CardContent className="py-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-sm text-foreground">{session.title}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {new Date(session.sessionDate).toLocaleDateString("ar-EG")}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <Badge variant="outline" className="text-xs">
-                        {session.attendedCount}/{session.totalCount} حضروا
-                      </Badge>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                </div>
+      {/* Sessions List for Scouts */}
+      {!isAdmin && (
+        <>
+          {isLoading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full" />)}
+            </div>
+          ) : sessions?.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center text-muted-foreground">
+                No sessions yet
               </CardContent>
             </Card>
-          ))}
-        </div>
+          ) : (
+            <div className="space-y-3">
+              {sessions?.map((session) => (
+                <Card
+                  key={session.id}
+                  className="cursor-pointer hover:border-primary/50 transition-colors"
+                  onClick={() => setSelectedSessionId(session.id)}
+                  data-testid={`session-card-${session.id}`}
+                >
+                  <CardContent className="py-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-sm text-foreground">{session.title}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {new Date(session.sessionDate).toLocaleDateString("ar-EG")}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="text-right">
+                          <Badge variant="outline" className="text-xs">
+                            {session.attendedCount}/{session.totalCount} حضروا
+                          </Badge>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* Create Session Dialog */}

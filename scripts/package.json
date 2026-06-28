@@ -5,10 +5,19 @@
   "type": "module",
   "scripts": {
     "hello": "tsx ./src/hello.ts",
+    "promote-to-leader": "node ./src/promote-to-leader.mjs \"$@\"",
+    "create-admin": "node ./src/create-admin.mjs",
+    "fix-email-index": "node ./fix-email-index.mjs",
+    "cleanup-database": "tsx ./cleanup-database.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "devDependencies": {
     "@types/node": "catalog:",
     "tsx": "catalog:"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "mongodb": "^6.10.0",
+    "mongoose": "^8.0.0"
   }
 }

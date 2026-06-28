@@ -31,10 +31,11 @@ export type ScoutUserRole = typeof ScoutUserRole[keyof typeof ScoutUserRole];
 export const ScoutUserRole = {
   scout: 'scout',
   leader: 'leader',
+  developer: 'developer',
 } as const;
 
 export interface ScoutUser {
-  id: number;
+  id: string;
   replitId: string;
   /** @nullable */
   firstName: string | null;
@@ -54,6 +55,7 @@ export type UserRoleUpdateRole = typeof UserRoleUpdateRole[keyof typeof UserRole
 export const UserRoleUpdateRole = {
   scout: 'scout',
   leader: 'leader',
+  developer: 'developer',
 } as const;
 
 export interface UserRoleUpdate {
@@ -67,7 +69,7 @@ export interface UserStats {
 }
 
 export interface AttendanceSession {
-  id: number;
+  id: string;
   title: string;
   sessionDate: string;
   /** @nullable */
@@ -93,7 +95,7 @@ export const AttendanceRecordStatus = {
 } as const;
 
 export interface AttendanceRecord {
-  userId: number;
+  userId: string;
   /** @nullable */
   scoutName: string | null;
   /** @nullable */
@@ -102,7 +104,7 @@ export interface AttendanceRecord {
 }
 
 export interface AttendanceSessionDetail {
-  id: number;
+  id: string;
   title: string;
   sessionDate: string;
   /** @nullable */
@@ -120,7 +122,7 @@ export const AttendanceRecordItemStatus = {
 } as const;
 
 export interface AttendanceRecordItem {
-  userId: number;
+  userId: string;
   status: AttendanceRecordItemStatus;
 }
 

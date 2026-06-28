@@ -1,23 +1,29 @@
 import { Router } from "express";
+import { randomUUID } from "crypto";
 import { AttendanceSessionModel, AttendanceRecordModel, ScoutProfileModel, UserModel } from "@workspace/db";
 import { CreateAttendanceSessionBody, SubmitAttendanceRecordsBody } from "@workspace/api-zod";
 
 const router = Router();
 
 async function getProfile(userId: string) {
-  const profile = await db
-    .select({ role: scoutProfilesTable.role })
-    .from(scoutProfilesTable)
-    .where(eq(scoutProfilesTable.userId, userId))
-    .limit(1);
-  return profile[0] || null;
+  const profile = await ScoutProfileModel.findOne({ userId });
+  return profile;
 }
 
 async function ensureProfile(userId: string) {
-  const existing = await db.select().from(scoutProfilesTable).where(eq(scoutProfilesTable.userId, userId)).limit(1);
-  if (existing.length === 0) {
-    await db.insert(scoutProfilesTable).values({ userId, role: "scout" });
+  const existing = await ScoutProfileModel.findOne({ userId });
+  if (!existing) {
+    await ScoutProfileModel.create({
+      id: randomUUID(),
+      userId,
+      role: "scout",
+    });
   }
+}
+
+async function isDeveloperOrLeader(userId: string): Promise<boolean> {
+  const profile = await ScoutProfileModel.findOne({ userId });
+  return profile?.role === "developer" || profile?.role === "leader";
 }
 
 router.get("/attendance/sessions", async (req, res) => {
@@ -26,22 +32,26 @@ router.get("/attendance/sessions", async (req, res) => {
     return;
   }
 
-  const sessions = await db
-    .select({
-      id: attendanceSessionsTable.id,
-      title: attendanceSessionsTable.title,
-      sessionDate: attendanceSessionsTable.sessionDate,
-      notes: attendanceSessionsTable.notes,
-      createdAt: attendanceSessionsTable.createdAt,
-      attendedCount: sql<number>`cast(count(case when ${attendanceRecordsTable.status} = 'present' then 1 end) as int)`,
-      totalCount: sql<number>`cast(count(${attendanceRecordsTable.id}) as int)`,
-    })
-    .from(attendanceSessionsTable)
-    .leftJoin(attendanceRecordsTable, eq(attendanceRecordsTable.sessionId, attendanceSessionsTable.id))
-    .groupBy(attendanceSessionsTable.id)
-    .orderBy(sql`${attendanceSessionsTable.sessionDate} desc`);
+  const sessions = await AttendanceSessionModel.find()
+    .sort({ sessionDate: -1 })
+    .lean();
 
-  res.json(sessions);
+  // Enrich with attendance counts
+  const enrichedSessions = await Promise.all(
+    sessions.map(async (session) => {
+      const records = await AttendanceRecordModel.find({ sessionId: session.id });
+      const attendedCount = records.filter(r => r.status === "present").length;
+      const totalCount = records.length;
+      
+      return {
+        ...session,
+        attendedCount,
+        totalCount,
+      };
+    })
+  );
+
+  res.json(enrichedSessions);
 });
 
 router.post("/attendance/sessions", async (req, res) => {
@@ -50,9 +60,9 @@ router.post("/attendance/sessions", async (req, res) => {
     return;
   }
   await ensureProfile(req.user.id);
-  const profile = await getProfile(req.user.id);
-  if (!profile || profile.role !== "leader") {
-    res.status(403).json({ error: "Leaders only" });
+  const hasAccess = await isDeveloperOrLeader(req.user.id);
+  if (!hasAccess) {
+    res.status(403).json({ error: "Leaders and developers only" });
     return;
   }
 
@@ -62,17 +72,15 @@ router.post("/attendance/sessions", async (req, res) => {
     return;
   }
 
-  const [session] = await db
-    .insert(attendanceSessionsTable)
-    .values({
-      title: parsed.data.title,
-      sessionDate: new Date(parsed.data.sessionDate),
-      notes: parsed.data.notes || null,
-      createdByUserId: req.user.id,
-    })
-    .returning();
+  const session = await AttendanceSessionModel.create({
+    id: randomUUID(),
+    title: parsed.data.title,
+    sessionDate: new Date(parsed.data.sessionDate),
+    notes: parsed.data.notes || null,
+    createdByUserId: req.user.id,
+  });
 
-  res.status(201).json({ ...session, attendedCount: 0, totalCount: 0 });
+  res.status(201).json({ ...session.toObject(), attendedCount: 0, totalCount: 0 });
 });
 
 router.get("/attendance/sessions/:sessionId", async (req, res) => {
@@ -81,36 +89,35 @@ router.get("/attendance/sessions/:sessionId", async (req, res) => {
     return;
   }
 
-  const sessionId = parseInt(req.params.sessionId);
-  if (isNaN(sessionId)) {
+  const sessionId = req.params.sessionId;
+  if (!sessionId) {
     res.status(400).json({ error: "Invalid session ID" });
     return;
   }
 
-  const sessions = await db
-    .select()
-    .from(attendanceSessionsTable)
-    .where(eq(attendanceSessionsTable.id, sessionId))
-    .limit(1);
-
-  if (sessions.length === 0) {
+  const session = await AttendanceSessionModel.findOne({ id: sessionId });
+  if (!session) {
     res.status(404).json({ error: "Session not found" });
     return;
   }
 
-  const records = await db
-    .select({
-      userId: scoutProfilesTable.id,
-      scoutName: sql<string>`concat(${usersTable.firstName}, ' ', ${usersTable.lastName})`,
-      profileImageUrl: usersTable.profileImageUrl,
-      status: attendanceRecordsTable.status,
-    })
-    .from(attendanceRecordsTable)
-    .innerJoin(usersTable, eq(usersTable.id, attendanceRecordsTable.userId))
-    .innerJoin(scoutProfilesTable, eq(scoutProfilesTable.userId, usersTable.id))
-    .where(eq(attendanceRecordsTable.sessionId, sessionId));
+  const records = await AttendanceRecordModel.find({ sessionId }).lean();
 
-  res.json({ ...sessions[0], records });
+  // Enrich with user information
+  const enrichedRecords = await Promise.all(
+    records.map(async (record) => {
+      const user = await UserModel.findOne({ id: record.userId }).lean();
+      const profile = await ScoutProfileModel.findOne({ userId: record.userId }).lean();
+      return {
+        userId: profile?.id,
+        scoutName: user ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() : null,
+        profileImageUrl: user?.profileImageUrl ?? null,
+        status: record.status,
+      };
+    })
+  );
+
+  res.json({ ...session.toObject(), records: enrichedRecords });
 });
 
 router.post("/attendance/sessions/:sessionId/records", async (req, res) => {
@@ -119,14 +126,14 @@ router.post("/attendance/sessions/:sessionId/records", async (req, res) => {
     return;
   }
   await ensureProfile(req.user.id);
-  const profile = await getProfile(req.user.id);
-  if (!profile || profile.role !== "leader") {
-    res.status(403).json({ error: "Leaders only" });
+  const hasAccess = await isDeveloperOrLeader(req.user.id);
+  if (!hasAccess) {
+    res.status(403).json({ error: "Leaders and developers only" });
     return;
   }
 
-  const sessionId = parseInt(req.params.sessionId);
-  if (isNaN(sessionId)) {
+  const sessionId = req.params.sessionId;
+  if (!sessionId) {
     res.status(400).json({ error: "Invalid session ID" });
     return;
   }
@@ -137,46 +144,52 @@ router.post("/attendance/sessions/:sessionId/records", async (req, res) => {
     return;
   }
 
-  await db
-    .delete(attendanceRecordsTable)
-    .where(eq(attendanceRecordsTable.sessionId, sessionId));
+  // Delete existing records
+  await AttendanceRecordModel.deleteMany({ sessionId });
 
-  const allScouts = await db
-    .select({ userId: usersTable.id })
-    .from(usersTable)
-    .innerJoin(scoutProfilesTable, eq(scoutProfilesTable.userId, usersTable.id));
+  // Get all scouts
+  const allProfiles = await ScoutProfileModel.find({ role: "scout" }).lean();
+  const allUsers = await Promise.all(
+    allProfiles.map(async (profile) => {
+      const user = await UserModel.findOne({ id: profile.userId }).lean();
+      return { ...profile, user };
+    })
+  );
 
+  // Insert new records
   if (parsed.data.records.length > 0) {
     const recordsToInsert = parsed.data.records.map((r) => {
-      const scout = allScouts.find((s) => s.userId === String(r.userId));
+      // Find the scout by replitId (userId from frontend) or profile ID
+      const scout = allUsers.find((s) => s.userId === r.userId || s.id === r.userId);
       return {
+        id: randomUUID(),
         sessionId,
-        userId: scout ? scout.userId : String(r.userId),
+        userId: scout ? scout.userId : r.userId,
         status: r.status as "present" | "absent",
       };
     });
-    await db.insert(attendanceRecordsTable).values(recordsToInsert);
+    await AttendanceRecordModel.insertMany(recordsToInsert);
   }
 
-  const sessions = await db
-    .select()
-    .from(attendanceSessionsTable)
-    .where(eq(attendanceSessionsTable.id, sessionId))
-    .limit(1);
+  // Get updated session and records
+  const session = await AttendanceSessionModel.findOne({ id: sessionId });
+  const records = await AttendanceRecordModel.find({ sessionId }).lean();
 
-  const records = await db
-    .select({
-      userId: scoutProfilesTable.id,
-      scoutName: sql<string>`concat(${usersTable.firstName}, ' ', ${usersTable.lastName})`,
-      profileImageUrl: usersTable.profileImageUrl,
-      status: attendanceRecordsTable.status,
+  // Enrich with user information
+  const enrichedRecords = await Promise.all(
+    records.map(async (record) => {
+      const user = await UserModel.findOne({ id: record.userId }).lean();
+      const profile = await ScoutProfileModel.findOne({ userId: record.userId }).lean();
+      return {
+        userId: profile?.id,
+        scoutName: user ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() : null,
+        profileImageUrl: user?.profileImageUrl ?? null,
+        status: record.status,
+      };
     })
-    .from(attendanceRecordsTable)
-    .innerJoin(usersTable, eq(usersTable.id, attendanceRecordsTable.userId))
-    .innerJoin(scoutProfilesTable, eq(scoutProfilesTable.userId, usersTable.id))
-    .where(eq(attendanceRecordsTable.sessionId, sessionId));
+  );
 
-  res.json({ ...sessions[0], records });
+  res.json({ ...session?.toObject(), records: enrichedRecords });
 });
 
 router.get("/attendance/my-summary", async (req, res) => {
@@ -185,15 +198,12 @@ router.get("/attendance/my-summary", async (req, res) => {
     return;
   }
 
-  const totalSessions = await db.select({ count: count() }).from(attendanceSessionsTable);
-  const myRecords = await db
-    .select({ status: attendanceRecordsTable.status })
-    .from(attendanceRecordsTable)
-    .where(eq(attendanceRecordsTable.userId, req.user.id));
+  const totalSessions = await AttendanceSessionModel.countDocuments();
+  const myRecords = await AttendanceRecordModel.find({ userId: req.user.id });
 
   const attended = myRecords.filter((r) => r.status === "present").length;
   const absent = myRecords.filter((r) => r.status === "absent").length;
-  const total = Number(totalSessions[0]?.count ?? 0);
+  const total = totalSessions;
 
   res.json({
     totalSessions: total,

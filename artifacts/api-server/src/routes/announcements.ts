@@ -1,22 +1,28 @@
 import { Router } from "express";
+import { randomUUID } from "crypto";
 import { AnnouncementModel, ScoutProfileModel, UserModel } from "@workspace/db";
 import { CreateAnnouncementBody } from "@workspace/api-zod";
 
 const router = Router();
 
 async function getProfile(userId: string) {
-  const profile = await db
-    .select({ role: scoutProfilesTable.role })
-    .from(scoutProfilesTable)
-    .where(eq(scoutProfilesTable.userId, userId))
-    .limit(1);
-  return profile[0] || null;
+  const profile = await ScoutProfileModel.findOne({ userId });
+  return profile;
+}
+
+async function isDeveloperOrLeader(userId: string): Promise<boolean> {
+  const profile = await ScoutProfileModel.findOne({ userId });
+  return profile?.role === "developer" || profile?.role === "leader";
 }
 
 async function ensureProfile(userId: string) {
-  const existing = await db.select().from(scoutProfilesTable).where(eq(scoutProfilesTable.userId, userId)).limit(1);
-  if (existing.length === 0) {
-    await db.insert(scoutProfilesTable).values({ userId, role: "scout" });
+  const existing = await ScoutProfileModel.findOne({ userId });
+  if (!existing) {
+    await ScoutProfileModel.create({
+      id: randomUUID(),
+      userId,
+      role: "scout",
+    });
   }
 }
 
@@ -26,20 +32,23 @@ router.get("/announcements", async (req, res) => {
     return;
   }
 
-  const announcements = await db
-    .select({
-      id: announcementsTable.id,
-      title: announcementsTable.title,
-      content: announcementsTable.content,
-      createdAt: announcementsTable.createdAt,
-      authorName: sql<string>`concat(${usersTable.firstName}, ' ', ${usersTable.lastName})`,
-      authorImageUrl: usersTable.profileImageUrl,
-    })
-    .from(announcementsTable)
-    .innerJoin(usersTable, eq(usersTable.id, announcementsTable.authorUserId))
-    .orderBy(sql`${announcementsTable.createdAt} desc`);
+  const announcements = await AnnouncementModel.find()
+    .sort({ createdAt: -1 })
+    .lean();
 
-  res.json(announcements);
+  // Enrich with author information
+  const enrichedAnnouncements = await Promise.all(
+    announcements.map(async (announcement) => {
+      const author = await UserModel.findOne({ id: announcement.authorUserId }).lean();
+      return {
+        ...announcement,
+        authorName: author ? `${author.firstName ?? ""} ${author.lastName ?? ""}`.trim() : null,
+        authorImageUrl: author?.profileImageUrl ?? null,
+      };
+    })
+  );
+
+  res.json(enrichedAnnouncements);
 });
 
 router.post("/announcements", async (req, res) => {
@@ -48,9 +57,9 @@ router.post("/announcements", async (req, res) => {
     return;
   }
   await ensureProfile(req.user.id);
-  const profile = await getProfile(req.user.id);
-  if (!profile || profile.role !== "leader") {
-    res.status(403).json({ error: "Leaders only" });
+  const hasAccess = await isDeveloperOrLeader(req.user.id);
+  if (!hasAccess) {
+    res.status(403).json({ error: "Leaders and developers only" });
     return;
   }
 
@@ -60,25 +69,19 @@ router.post("/announcements", async (req, res) => {
     return;
   }
 
-  const [announcement] = await db
-    .insert(announcementsTable)
-    .values({
-      title: parsed.data.title,
-      content: parsed.data.content,
-      authorUserId: req.user.id,
-    })
-    .returning();
+  const announcement = await AnnouncementModel.create({
+    id: randomUUID(),
+    title: parsed.data.title,
+    content: parsed.data.content,
+    authorUserId: req.user.id,
+  });
 
-  const author = await db
-    .select({ firstName: usersTable.firstName, lastName: usersTable.lastName, profileImageUrl: usersTable.profileImageUrl })
-    .from(usersTable)
-    .where(eq(usersTable.id, req.user.id))
-    .limit(1);
+  const author = await UserModel.findOne({ id: req.user.id }).lean();
 
   res.status(201).json({
-    ...announcement,
-    authorName: author[0] ? `${author[0].firstName ?? ""} ${author[0].lastName ?? ""}`.trim() : null,
-    authorImageUrl: author[0]?.profileImageUrl ?? null,
+    ...announcement.toObject(),
+    authorName: author ? `${author.firstName ?? ""} ${author.lastName ?? ""}`.trim() : null,
+    authorImageUrl: author?.profileImageUrl ?? null,
   });
 });
 
@@ -88,19 +91,19 @@ router.delete("/announcements/:announcementId", async (req, res) => {
     return;
   }
   await ensureProfile(req.user.id);
-  const profile = await getProfile(req.user.id);
-  if (!profile || profile.role !== "leader") {
-    res.status(403).json({ error: "Leaders only" });
+  const hasAccess = await isDeveloperOrLeader(req.user.id);
+  if (!hasAccess) {
+    res.status(403).json({ error: "Leaders and developers only" });
     return;
   }
 
-  const announcementId = parseInt(req.params.announcementId);
-  if (isNaN(announcementId)) {
+  const announcementId = req.params.announcementId;
+  if (!announcementId) {
     res.status(400).json({ error: "Invalid ID" });
     return;
   }
 
-  await db.delete(announcementsTable).where(eq(announcementsTable.id, announcementId));
+  await AnnouncementModel.deleteOne({ id: announcementId });
   res.json({ success: true });
 });
 

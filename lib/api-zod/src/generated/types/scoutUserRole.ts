@@ -12,4 +12,5 @@ export type ScoutUserRole = typeof ScoutUserRole[keyof typeof ScoutUserRole];
 export const ScoutUserRole = {
   scout: 'scout',
   leader: 'leader',
+  developer: 'developer',
 } as const;

@@ -100,6 +100,8 @@ async function buildAll() {
       "puppeteer",
       "puppeteer-core",
       "electron",
+      "mongoose",
+      "mongodb",
     ],
     sourcemap: "linked",
     plugins: [

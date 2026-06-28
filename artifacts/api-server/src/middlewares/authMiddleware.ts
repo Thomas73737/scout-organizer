@@ -31,9 +31,14 @@ async function refreshIfExpired(
   session: SessionData,
 ): Promise<SessionData | null> {
   const now = Math.floor(Date.now() / 1000);
+  
+  // For form-based auth (no refresh_token), don't check expiration
+  // Let the session expire naturally based on the database TTL
+  if (!session.refresh_token) {
+    return session;
+  }
+  
   if (!session.expires_at || now <= session.expires_at) return session;
-
-  if (!session.refresh_token) return null;
 
   try {
     const config = await getOidcConfig();

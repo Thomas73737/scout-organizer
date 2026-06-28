@@ -35,7 +35,7 @@ export default function Announcements() {
   const { toast } = useToast();
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const isLeader = profile?.role === "leader";
+  const isLeader = profile?.role === "leader" || profile?.role === "developer";
 
   const form = useForm<AnnouncementForm>({
     resolver: zodResolver(announcementSchema),

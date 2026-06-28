@@ -8,6 +8,6 @@
 import type { AttendanceRecordItemStatus } from './attendanceRecordItemStatus';
 
 export interface AttendanceRecordItem {
-  userId: number;
+  userId: string;
   status: AttendanceRecordItemStatus;
 }

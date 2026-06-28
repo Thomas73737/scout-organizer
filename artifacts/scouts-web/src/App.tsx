@@ -15,6 +15,7 @@ import Posts from "@/pages/posts";
 import Profile from "@/pages/profile";
 import Admin from "@/pages/admin";
 import Login from "@/pages/login";
+import Waiting from "@/pages/waiting";
 
 const queryClient = new QueryClient();
 
@@ -30,7 +31,7 @@ function ProtectedRoute({ component: Component, adminOnly = false }: { component
     return <Redirect to="/login" />;
   }
 
-  if (adminOnly && profile?.role !== "leader") {
+  if (adminOnly && profile?.role !== "leader" && profile?.role !== "developer") {
     return <Redirect to="/" />;
   }
 
@@ -47,6 +48,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
+      <Route path="/waiting" component={Waiting} />
       <Route path="/">
         <ProtectedRoute component={Home} />
       </Route>

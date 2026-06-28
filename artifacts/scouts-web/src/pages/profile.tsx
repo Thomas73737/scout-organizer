@@ -51,10 +51,10 @@ export default function Profile() {
                 <div className="flex items-center gap-2 mt-1">
                   <Badge
                     className="capitalize"
-                    variant={profile?.role === "leader" ? "default" : "secondary"}
+                    variant={profile?.role === "leader" || profile?.role === "developer" ? "default" : "secondary"}
                     data-testid="text-profile-role"
                   >
-                    {profile?.role === "leader" ? "Leader / قائد" : "Scout / كشاف"}
+                    {profile?.role === "leader" ? "Leader / قائد" : profile?.role === "developer" ? "Developer / مطور" : "Scout / كشاف"}
                   </Badge>
                 </div>
               </div>

@@ -1,6 +1,8 @@
 import { Storage, File } from "@google-cloud/storage";
 import { Readable } from "stream";
 import { randomUUID } from "crypto";
+import * as fs from "fs";
+import * as path from "path";
 import {
   ObjectAclPolicy,
   ObjectPermission,
@@ -10,8 +12,23 @@ import {
 } from "./objectAcl";
 
 const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
+const IS_LOCAL_DEV = !process.env.REPLIT_DEPLOYMENT;
 
-export const objectStorageClient = new Storage({
+// Local storage directory for development
+const LOCAL_STORAGE_DIR = path.join(process.cwd(), "local-storage");
+const LOCAL_UPLOADS_DIR = path.join(LOCAL_STORAGE_DIR, "uploads");
+
+// Ensure local storage directories exist
+if (IS_LOCAL_DEV) {
+  if (!fs.existsSync(LOCAL_STORAGE_DIR)) {
+    fs.mkdirSync(LOCAL_STORAGE_DIR, { recursive: true });
+  }
+  if (!fs.existsSync(LOCAL_UPLOADS_DIR)) {
+    fs.mkdirSync(LOCAL_UPLOADS_DIR, { recursive: true });
+  }
+}
+
+export const objectStorageClient = IS_LOCAL_DEV ? null : new Storage({
   credentials: {
     audience: "replit",
     subject_token_type: "access_token",
@@ -41,6 +58,9 @@ export class ObjectStorageService {
   constructor() {}
 
   getPublicObjectSearchPaths(): Array<string> {
+    if (IS_LOCAL_DEV) {
+      return [LOCAL_STORAGE_DIR];
+    }
     const pathsStr = process.env.PUBLIC_OBJECT_SEARCH_PATHS || "";
     const paths = Array.from(
       new Set(
@@ -60,6 +80,9 @@ export class ObjectStorageService {
   }
 
   getPrivateObjectDir(): string {
+    if (IS_LOCAL_DEV) {
+      return LOCAL_STORAGE_DIR;
+    }
     const dir = process.env.PRIVATE_OBJECT_DIR || "";
     if (!dir) {
       throw new Error(
@@ -71,11 +94,23 @@ export class ObjectStorageService {
   }
 
   async searchPublicObject(filePath: string): Promise<File | null> {
+    if (IS_LOCAL_DEV) {
+      // Local file system fallback
+      for (const searchPath of this.getPublicObjectSearchPaths()) {
+        const fullPath = path.join(searchPath, filePath);
+        if (fs.existsSync(fullPath)) {
+          // Return a mock File object for local files
+          return this.createMockFile(fullPath);
+        }
+      }
+      return null;
+    }
+
     for (const searchPath of this.getPublicObjectSearchPaths()) {
       const fullPath = `${searchPath}/${filePath}`;
 
       const { bucketName, objectName } = parseObjectPath(fullPath);
-      const bucket = objectStorageClient.bucket(bucketName);
+      const bucket = objectStorageClient!.bucket(bucketName);
       const file = bucket.file(objectName);
 
       const [exists] = await file.exists();
@@ -88,6 +123,22 @@ export class ObjectStorageService {
   }
 
   async downloadObject(file: File, cacheTtlSec: number = 3600): Promise<Response> {
+    if (IS_LOCAL_DEV && this.isMockFile(file)) {
+      // Handle local file download
+      const filePath = (file as any).localPath;
+      const fileStream = fs.createReadStream(filePath);
+      const webStream = Readable.toWeb(fileStream) as ReadableStream;
+      const stats = fs.statSync(filePath);
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/octet-stream",
+        "Cache-Control": `public, max-age=${cacheTtlSec}`,
+        "Content-Length": String(stats.size),
+      };
+
+      return new Response(webStream, { headers });
+    }
+
     const [metadata] = await file.getMetadata();
     const aclPolicy = await getObjectAclPolicy(file);
     const isPublic = aclPolicy?.visibility === "public";
@@ -118,6 +169,11 @@ export class ObjectStorageService {
     const objectId = randomUUID();
     const fullPath = `${privateObjectDir}/uploads/${objectId}`;
 
+    if (IS_LOCAL_DEV) {
+      // For local development, return a direct API endpoint for upload
+      return `http://localhost:5000/api/storage/local-upload/${objectId}`;
+    }
+
     const { bucketName, objectName } = parseObjectPath(fullPath);
 
     return signObjectURL({
@@ -144,8 +200,18 @@ export class ObjectStorageService {
       entityDir = `${entityDir}/`;
     }
     const objectEntityPath = `${entityDir}${entityId}`;
+
+    if (IS_LOCAL_DEV) {
+      // Handle local file system
+      const filePath = path.join(entityDir, entityId);
+      if (fs.existsSync(filePath)) {
+        return this.createMockFile(filePath);
+      }
+      throw new ObjectNotFoundError();
+    }
+
     const { bucketName, objectName } = parseObjectPath(objectEntityPath);
-    const bucket = objectStorageClient.bucket(bucketName);
+    const bucket = objectStorageClient!.bucket(bucketName);
     const objectFile = bucket.file(objectName);
     const [exists] = await objectFile.exists();
     if (!exists) {
@@ -155,6 +221,13 @@ export class ObjectStorageService {
   }
 
   normalizeObjectEntityPath(rawPath: string): string {
+    // Handle local development URLs
+    if (IS_LOCAL_DEV && rawPath.includes('local-upload')) {
+      const url = new URL(rawPath);
+      const objectId = url.pathname.split('/').pop();
+      return `/objects/uploads/${objectId}`;
+    }
+
     if (!rawPath.startsWith("https://storage.googleapis.com/")) {
       return rawPath;
     }
@@ -198,11 +271,37 @@ export class ObjectStorageService {
     objectFile: File;
     requestedPermission?: ObjectPermission;
   }): Promise<boolean> {
+    if (IS_LOCAL_DEV && this.isMockFile(objectFile)) {
+      // Local files are always accessible in development
+      return true;
+    }
     return canAccessObject({
       userId,
       objectFile,
       requestedPermission: requestedPermission ?? ObjectPermission.READ,
     });
+  }
+
+  // Helper methods for local file system mock
+  private createMockFile(filePath: string): File {
+    const mockFile = {
+      localPath: filePath,
+      isMock: true,
+      getMetadata: async () => {
+        const stats = fs.statSync(filePath);
+        return {
+          contentType: "application/octet-stream",
+          size: stats.size,
+        };
+      },
+      createReadStream: () => fs.createReadStream(filePath),
+      exists: async () => [fs.existsSync(filePath)],
+    } as any;
+    return mockFile;
+  }
+
+  private isMockFile(file: File): boolean {
+    return (file as any).isMock === true;
   }
 }
 

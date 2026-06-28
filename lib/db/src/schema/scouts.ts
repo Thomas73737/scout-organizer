@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-export const roleEnum = ["scout", "leader"] as const;
+export const roleEnum = ["scout", "leader", "developer"] as const;
 
 const scoutProfileSchema = new mongoose.Schema({
   id: { type: String, unique: true, sparse: true },

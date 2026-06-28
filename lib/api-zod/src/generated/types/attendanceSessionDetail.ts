@@ -8,7 +8,7 @@
 import type { AttendanceRecord } from './attendanceRecord';
 
 export interface AttendanceSessionDetail {
-  id: number;
+  id: string;
   title: string;
   sessionDate: Date;
   /** @nullable */

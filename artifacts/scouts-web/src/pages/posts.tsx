@@ -66,16 +66,27 @@ export default function Posts() {
           );
         });
 
-        await fetch(urlResult.uploadURL, {
-          method: "PUT",
-          body: selectedFile,
-          headers: { "Content-Type": selectedFile.type },
-        });
+        // Handle both local and cloud upload URLs
+        if (urlResult.uploadURL.includes('local-upload')) {
+          // Local development upload
+          await fetch(urlResult.uploadURL, {
+            method: "PUT",
+            body: selectedFile,
+          });
+        } else {
+          // Cloud storage upload
+          await fetch(urlResult.uploadURL, {
+            method: "PUT",
+            body: selectedFile,
+            headers: { "Content-Type": selectedFile.type },
+          });
+        }
 
         fileUrl = urlResult.objectPath;
         fileName = selectedFile.name;
         fileType = selectedFile.type;
-      } catch {
+      } catch (error) {
+        console.error("Upload error:", error);
         toast({ title: "File upload failed", variant: "destructive" });
         setIsUploading(false);
         return;
@@ -113,7 +124,7 @@ export default function Posts() {
   };
 
   const canDelete = (post: any) => {
-    if (profile?.role === "leader") return true;
+    if (profile?.role === "leader" || profile?.role === "developer") return true;
     return post.authorId === profile?.id;
   };
 

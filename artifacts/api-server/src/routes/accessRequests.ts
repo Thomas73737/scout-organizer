@@ -8,33 +8,141 @@ import {
 
 const router = Router();
 
-async function ensureLeader(userId: string) {
+async function ensureLeaderOrDeveloper(userId: string) {
   const profile = await ScoutProfileModel.findOne({ userId });
-  return profile && profile.role === "leader";
+  return profile && (profile.role === "leader" || profile.role === "developer");
 }
 
 router.post("/access-requests", async (req, res) => {
-  const { name, phone, team } = req.body as {
+  const { 
+    name, 
+    email, 
+    password, 
+    phone, 
+    section, 
+    team, 
+    isNewScout,
+    whatsappNumber,
+    parentsWhatsappNumber,
+    homeAddress,
+    photoUrl,
+    patrol
+  } = req.body as {
     name?: string;
+    email?: string;
+    password?: string;
     phone?: string;
+    section?: string;
     team?: string;
+    isNewScout?: boolean;
+    whatsappNumber?: string;
+    parentsWhatsappNumber?: string;
+    homeAddress?: string;
+    photoUrl?: string;
+    patrol?: string;
   };
 
-  if (!name || !phone || !team) {
-    res.status(400).json({ error: "name, phone and team are required" });
+  if (!name || !email || !password || !phone || !section || !team || typeof isNewScout !== 'boolean') {
+    res.status(400).json({ error: "name, email, password, phone, section, team, and isNewScout are required" });
     return;
   }
 
+  // Validate three-part name
+  const nameParts = name.trim().split(/\s+/);
+  if (nameParts.length < 3) {
+    res.status(400).json({ error: "Please enter your full three-part name (e.g., youssef miro soshi). First name only is not accepted." });
+    return;
+  }
+
+  // Validate new scout fields
+  if (isNewScout) {
+    if (!whatsappNumber || !parentsWhatsappNumber || !homeAddress || !photoUrl) {
+      res.status(400).json({ error: "whatsappNumber, parentsWhatsappNumber, homeAddress, and photoUrl are required for new scouts" });
+      return;
+    }
+    // Patrol is not required for new scouts
+  } else {
+    // For existing scouts, patrol is required
+    if (!patrol) {
+      res.status(400).json({ error: "patrol is required for existing scouts" });
+      return;
+    }
+  }
+
+  const validSections = ["سنافر", "اشبال", "زهرات", "كشافة", "مرشدات"];
+  const validTeams = ["A", "B"];
+  const validPatrols = ["صقر", "فهد", "ثعلب", "ذئب", "نمر", "نسر", "أسد", "غراب", "بلبل", "ديك", "خفاش", "غزال"];
+
+  if (!validSections.includes(section)) {
+    res.status(400).json({ error: "Invalid section. Must be one of: سنافر, اشبال, زهرات, كشافة, مرشدات" });
+    return;
+  }
+
+  if (!validTeams.includes(team.toUpperCase())) {
+    res.status(400).json({ error: "Invalid team. Must be A or B" });
+    return;
+  }
+
+  if (patrol && !validPatrols.includes(patrol)) {
+    res.status(400).json({ error: "Invalid patrol. Must be one of: صقر, فهد, ثعلب, ذئب, نمر, نسر, أسد, غراب, بلبل, ديك, خفاش, غزال" });
+    return;
+  }
+
+  const trimmedTeam = team.toUpperCase();
+
   try {
-    await AccessRequestModel.create({
-      id: randomUUID(),
-      name: name.trim(),
+    // Check if user already exists by email or phone
+    const existingUser = await UserModel.findOne({ 
+      $or: [{ email: email.trim() }, { phone: phone.trim() }] 
+    });
+    if (existingUser) {
+      res.status(400).json({ error: "A user with this email or phone number already exists" });
+      return;
+    }
+
+    // Create user with pending status
+    const newUserId = randomUUID();
+    const nameParts = name.trim().split(/\s+/);
+    const user = await UserModel.create({
+      id: newUserId,
+      firstName: nameParts[0], // First name
+      lastName: nameParts.slice(1).join(" "), // Middle and last names combined
+      email: email.trim(),
+      password: password, // In production, this should be hashed
       phone: phone.trim(),
-      team: team.trim(),
+      section: section,
+      team: trimmedTeam,
+      profileImageUrl: isNewScout ? photoUrl : undefined,
+      whatsappNumber: isNewScout ? whatsappNumber : undefined,
+      parentsWhatsappNumber: isNewScout ? parentsWhatsappNumber : undefined,
+      homeAddress: isNewScout ? homeAddress : undefined,
+      patrol: patrol || undefined, // Save patrol only if provided
       status: "pending",
     });
 
-    res.status(201).json({ message: "Access request submitted" });
+    // Create corresponding access request for tracking
+    await AccessRequestModel.create({
+      id: randomUUID(),
+      name: name.trim(),
+      email: email.trim(),
+      password: password,
+      phone: phone.trim(),
+      section: section,
+      team: trimmedTeam,
+      isNewScout,
+      whatsappNumber: isNewScout ? whatsappNumber : undefined,
+      parentsWhatsappNumber: isNewScout ? parentsWhatsappNumber : undefined,
+      homeAddress: isNewScout ? homeAddress : undefined,
+      photoUrl: isNewScout ? photoUrl : undefined,
+      patrol: patrol || undefined, // Save patrol only if provided
+      status: "pending",
+    });
+
+    res.status(201).json({ 
+      message: "Access request submitted. Please wait for admin approval.",
+      userId: newUserId,
+      status: "pending"
+    });
   } catch (err: any) {
     console.error("Failed to create access request:", err?.message ?? err);
     res.status(500).json({ error: err?.message ?? "Internal server error" });
@@ -47,7 +155,7 @@ router.get("/access-requests", async (req, res) => {
     return;
   }
 
-  if (!(await ensureLeader((req as any).user?.id))) {
+  if (!(await ensureLeaderOrDeveloper((req as any).user?.id))) {
     res.status(403).json({ error: "Leaders only" });
     return;
   }
@@ -62,7 +170,7 @@ router.post("/access-requests/:requestId/approve", async (req, res) => {
     return;
   }
 
-  if (!(await ensureLeader((req as any).user?.id))) {
+  if (!(await ensureLeaderOrDeveloper((req as any).user?.id))) {
     res.status(403).json({ error: "Leaders only" });
     return;
   }
@@ -81,26 +189,44 @@ router.post("/access-requests/:requestId/approve", async (req, res) => {
   }
 
   try {
-    const newUserId = randomUUID();
-    const user = await UserModel.create({
-      id: newUserId,
-      firstName: request.name.split(" ")[0],
-      lastName: request.name.split(" ").slice(1).join(" ") || undefined,
-      phone: request.phone,
-      team: request.team,
-    });
+    // Find the user by email (created during registration)
+    const user = await UserModel.findOne({ email: request.email });
+    
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
 
-    await ScoutProfileModel.create({
-      id: randomUUID(),
-      userId: newUserId,
-      role: "scout",
-    });
+    // Update user status to approved and copy additional fields from request
+    user.status = "approved";
+    user.updatedAt = new Date();
+    
+    // Copy new scout fields if they exist in the request
+    if (request.whatsappNumber) user.whatsappNumber = request.whatsappNumber;
+    if (request.parentsWhatsappNumber) user.parentsWhatsappNumber = request.parentsWhatsappNumber;
+    if (request.homeAddress) user.homeAddress = request.homeAddress;
+    if (request.photoUrl) user.profileImageUrl = request.photoUrl;
+    // Copy patrol if provided in the request (for both new and existing scouts)
+    if (request.patrol) user.patrol = request.patrol;
+    
+    await user.save();
 
+    // Create scout profile
+    const existingProfile = await ScoutProfileModel.findOne({ userId: user.id });
+    if (!existingProfile) {
+      await ScoutProfileModel.create({
+        id: randomUUID(),
+        userId: user.id!,
+        role: "scout",
+      });
+    }
+
+    // Update access request status
     request.status = "approved";
     request.updatedAt = new Date();
     await request.save();
 
-    res.json({ message: "Request approved and account created", userId: newUserId });
+    res.json({ message: "Request approved and account activated", userId: user.id });
   } catch (err: any) {
     console.error("Failed to approve request:", err?.message ?? err);
     res.status(500).json({ error: err?.message ?? "Internal server error" });
@@ -113,7 +239,7 @@ router.post("/access-requests/:requestId/deny", async (req, res) => {
     return;
   }
 
-  if (!(await ensureLeader((req as any).user?.id))) {
+  if (!(await ensureLeaderOrDeveloper((req as any).user?.id))) {
     res.status(403).json({ error: "Leaders only" });
     return;
   }
@@ -132,6 +258,17 @@ router.post("/access-requests/:requestId/deny", async (req, res) => {
   }
 
   try {
+    // Find the user by email (created during registration)
+    const user = await UserModel.findOne({ email: request.email });
+    
+    if (user) {
+      // Update user status to denied
+      user.status = "denied";
+      user.updatedAt = new Date();
+      await user.save();
+    }
+
+    // Update access request status
     request.status = "denied";
     request.updatedAt = new Date();
     await request.save();

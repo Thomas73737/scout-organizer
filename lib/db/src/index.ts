@@ -1,3 +1,18 @@
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
+import fs from "fs";
+
+// Load .env from project root
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const projectRoot = path.resolve(__dirname, "../../..");
+const envPath = path.join(projectRoot, ".env");
+
+if (fs.existsSync(envPath)) {
+  dotenv.config({ path: envPath });
+}
+
 import mongoose from "mongoose";
 import {
   UserModel,
@@ -10,16 +25,17 @@ import {
   AccessRequestModel,
 } from "./schema";
 
+// Use local MongoDB or provide a default for development
+const databaseUrl = process.env.DATABASE_URL || 'mongodb://localhost:27017/scout-organizer';
+
 if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
+  console.log("DATABASE_URL not set, using default:", databaseUrl);
 }
 
 // Connect to MongoDB
 export async function connectDB() {
   try {
-    await mongoose.connect(process.env.DATABASE_URL!);
+    await mongoose.connect(databaseUrl);
     console.log("Connected to MongoDB");
   } catch (error) {
     console.error("Failed to connect to MongoDB:", error);

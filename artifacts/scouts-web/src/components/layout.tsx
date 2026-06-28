@@ -11,7 +11,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const { data: profile } = useGetMyProfile();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
-  const isLeader = profile?.role === "leader";
+  const isLeader = profile?.role === "leader" || profile?.role === "developer";
 
   const navItems = [
     { label: "Home / الرئيسية", href: "/", icon: Home },

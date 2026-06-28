@@ -8,6 +8,7 @@ import {
   clearSession,
   getOidcConfig,
   getSessionId,
+  getSession,
   createSession,
   deleteSession,
   SESSION_COOKIE,
@@ -65,14 +66,18 @@ function getSafeReturnTo(value: unknown): string {
 }
 
 async function upsertUser(claims: Record<string, unknown>) {
-  const userData = {
+  const userData: Record<string, unknown> = {
     id: claims.sub as string,
-    email: (claims.email as string) || undefined,
     firstName: (claims.first_name as string) || undefined,
     lastName: (claims.last_name as string) || undefined,
     profileImageUrl: (claims.profile_image_url || claims.picture) as string | undefined,
     updatedAt: new Date(),
   };
+
+  // Only include email if it exists in claims
+  if (claims.email) {
+    userData.email = claims.email as string;
+  }
 
   const user = await UserModel.findOneAndUpdate(
     { id: userData.id },
@@ -82,10 +87,41 @@ async function upsertUser(claims: Record<string, unknown>) {
   return user;
 }
 
-router.get("/auth/user", (req: Request, res: Response) => {
+router.get("/auth/user", async (req: Request, res: Response) => {
+  // First check if user is authenticated via OIDC
+  if (req.isAuthenticated() && req.user) {
+    res.json(
+      GetCurrentAuthUserResponse.parse({
+        user: req.user,
+      }),
+    );
+    return;
+  }
+
+  // Fallback to form-based authentication
+  const sid = getSessionId(req);
+  if (!sid) {
+    res.json(
+      GetCurrentAuthUserResponse.parse({
+        user: null,
+      }),
+    );
+    return;
+  }
+
+  const session = await getSession(sid);
+  if (!session?.user?.id) {
+    res.json(
+      GetCurrentAuthUserResponse.parse({
+        user: null,
+      }),
+    );
+    return;
+  }
+
   res.json(
     GetCurrentAuthUserResponse.parse({
-      user: req.isAuthenticated() ? req.user : null,
+      user: session.user,
     }),
   );
 });
@@ -188,18 +224,29 @@ router.get("/callback", async (req: Request, res: Response) => {
 });
 
 router.get("/logout", async (req: Request, res: Response) => {
-  const config = await getOidcConfig();
-  const origin = getOrigin(req);
-
   const sid = getSessionId(req);
   await clearSession(res, sid);
 
-  const endSessionUrl = oidc.buildEndSessionUrl(config, {
-    client_id: process.env.REPL_ID!,
-    post_logout_redirect_uri: origin,
-  });
+  // If using OIDC, do the full logout flow
+  if (process.env.REPL_ID) {
+    try {
+      const config = await getOidcConfig();
+      const origin = getOrigin(req);
 
-  res.redirect(endSessionUrl.href);
+      const endSessionUrl = oidc.buildEndSessionUrl(config, {
+        client_id: process.env.REPL_ID!,
+        post_logout_redirect_uri: origin,
+      });
+
+      res.redirect(endSessionUrl.href);
+      return;
+    } catch {
+      // Fallback to simple redirect if OIDC fails
+    }
+  }
+
+  // Simple redirect for form-based auth
+  res.redirect("/");
 });
 
 

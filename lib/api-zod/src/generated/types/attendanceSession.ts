@@ -7,7 +7,7 @@
  */
 
 export interface AttendanceSession {
-  id: number;
+  id: string;
   title: string;
   sessionDate: Date;
   /** @nullable */
