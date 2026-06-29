@@ -1,8 +1,14 @@
-import { Router } from "express";
+import express, { Router } from "express";
 import { UserModel, ScoutProfileModel } from "@workspace/db";
 import { UpdateUserRoleBody } from "@workspace/api-zod";
 import { randomUUID } from "crypto";
 import { createSession } from "../lib/auth";
+import { hashPassword, verifyPassword } from "../lib/password";
+import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
+import * as path from "path";
+import * as fs from "fs";
+
+const objectStorage = new ObjectStorageService();
 
 const router = Router();
 
@@ -46,6 +52,194 @@ async function isDeveloper(userId: string): Promise<boolean> {
   const profile = await ScoutProfileModel.findOne({ userId });
   return profile?.role === "developer";
 }
+
+// Update profile image for the authenticated user
+router.post("/users/me/profile-image", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const { profileImageUrl } = req.body as { profileImageUrl?: string };
+
+  if (!profileImageUrl) {
+    res.status(400).json({ error: "profileImageUrl is required" });
+    return;
+  }
+
+  try {
+    const user = await UserModel.findOne({ id: req.user.id });
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    user.profileImageUrl = profileImageUrl;
+    user.updatedAt = new Date();
+    await user.save();
+
+    res.json({ message: "Profile image updated successfully", profileImageUrl });
+  } catch (err: any) {
+    console.error("Failed to update profile image:", err?.message ?? err);
+    res.status(500).json({ error: "Failed to update profile image" });
+  }
+});
+
+// Direct profile image upload (multipart-free, accepts raw image body)
+router.post("/users/me/profile-image/upload",
+  express.raw({ type: 'image/*', limit: '5mb' }),
+  async (req, res) => {
+    if (!req.isAuthenticated()) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    const buffer = req.body as Buffer;
+    if (!buffer || !Buffer.isBuffer(buffer) || buffer.length === 0) {
+      res.status(400).json({ error: "No image data received" });
+      return;
+    }
+
+    const contentType = req.headers['content-type'] || 'image/jpeg';
+    const extMap: Record<string, string> = {
+      'image/jpeg': '.jpg',
+      'image/png': '.png',
+      'image/gif': '.gif',
+      'image/webp': '.webp',
+      'image/bmp': '.bmp',
+      'image/svg+xml': '.svg',
+      'image/heic': '.heic',
+      'image/heif': '.heif',
+      'image/avif': '.avif',
+    };
+    const ext = extMap[contentType] || '.jpg';
+    const objectId = randomUUID();
+    const fileName = `${objectId}${ext}`;
+
+    const storageDir = path.join(process.cwd(), "local-storage", "uploads");
+    if (!fs.existsSync(storageDir)) {
+      fs.mkdirSync(storageDir, { recursive: true });
+    }
+    const filePath = path.join(storageDir, fileName);
+    fs.writeFileSync(filePath, buffer);
+
+    try {
+      fs.writeFileSync(filePath + '.meta', JSON.stringify({ originalName: `profile${ext}` }), 'utf-8');
+    } catch {}
+
+    const imageUrl = `/api/storage/objects/uploads/${fileName}`;
+
+    try {
+      const user = await UserModel.findOne({ id: req.user.id });
+      if (!user) {
+        res.status(404).json({ error: "User not found" });
+        return;
+      }
+      user.profileImageUrl = imageUrl;
+      user.updatedAt = new Date();
+      await user.save();
+      res.json({ message: "Profile image updated successfully", profileImageUrl: imageUrl });
+    } catch (err: any) {
+      console.error("Failed to update profile image:", err?.message ?? err);
+      res.status(500).json({ error: "Failed to update profile image" });
+    }
+  }
+);
+
+// Delete profile image for the authenticated user
+router.delete("/users/me/profile-image", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  try {
+    const user = await UserModel.findOne({ id: req.user.id });
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    const currentUrl = user.profileImageUrl;
+    user.profileImageUrl = "";
+    user.updatedAt = new Date();
+    await user.save({ validateBeforeSave: false });
+
+    // Try to delete the stored file if it's a local/uploaded image
+    if (currentUrl) {
+      try {
+        const pathname = currentUrl.startsWith("http")
+          ? new URL(currentUrl).pathname
+          : currentUrl;
+        const objectPath = pathname.replace("/api/storage/objects", "");
+        const file = await objectStorage.getObjectEntityFile(objectPath);
+        await objectStorage.deleteObject(file);
+      } catch (deleteErr) {
+        if (!(deleteErr instanceof ObjectNotFoundError)) {
+          console.error("Failed to delete profile image file:", deleteErr);
+        }
+      }
+    }
+
+    res.json({ message: "Profile image removed successfully" });
+  } catch (err: any) {
+    console.error("Failed to remove profile image:", err?.message ?? err);
+    res.status(500).json({ error: "Failed to remove profile image" });
+  }
+});
+
+// Change password for the authenticated user
+router.post("/users/change-password", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const { currentPassword, newPassword } = req.body as {
+    currentPassword?: string;
+    newPassword?: string;
+  };
+
+  if (!newPassword) {
+    res.status(400).json({ error: "newPassword is required" });
+    return;
+  }
+
+  if (newPassword.length < 4) {
+    res.status(400).json({ error: "New password must be at least 4 characters" });
+    return;
+  }
+
+  try {
+    const user = await UserModel.findOne({ id: req.user.id });
+    if (!user) {
+      res.status(404).json({ error: "User not found" });
+      return;
+    }
+
+    // If user already has a password set, verify the current password
+    if (user.password) {
+      if (!currentPassword) {
+        res.status(400).json({ error: "currentPassword is required" });
+        return;
+      }
+      if (!verifyPassword(currentPassword, user.password)) {
+        res.status(401).json({ error: "Current password is incorrect" });
+        return;
+      }
+    }
+    // If user has no password (e.g. OIDC user), skip currentPassword check
+
+    user.password = hashPassword(newPassword);
+    user.updatedAt = new Date();
+    await user.save({ validateBeforeSave: false });
+
+    res.json({ message: "Password changed successfully" });
+  } catch (err: any) {
+    console.error("Failed to change password:", err?.message ?? err);
+    res.status(500).json({ error: "Failed to change password" });
+  }
+});
 
 router.get("/users", async (req, res) => {
   if (!req.isAuthenticated()) {
@@ -181,7 +375,7 @@ router.patch("/users/:userId/patrol", async (req, res) => {
     return;
   }
 
-  targetUser.patrol = patrol;
+  targetUser.patrol = patrol as typeof targetUser.patrol;
   targetUser.updatedAt = new Date();
   await targetUser.save();
 
@@ -191,84 +385,33 @@ router.patch("/users/:userId/patrol", async (req, res) => {
 
 // Login endpoint for form-based authentication
 router.post("/users/login", async (req, res) => {
-  const { name, password } = req.body as {
-    name?: string;
+  const { email, password } = req.body as {
+    email?: string;
     password?: string;
   };
 
-  if (!name || !password) {
-    res.status(400).json({ error: "name and password are required" });
+  if (!email || !password) {
+    res.status(400).json({ error: "email and password are required" });
     return;
   }
 
-  // Validate three-part name for login - reject if only first name
-  // Exception: sofsafaSVS account can login with first name only
-  const nameParts = name.trim().split(/\s+/);
-  if (nameParts.length < 3 && name.toLowerCase() !== 'sofsafasvs') {
-    res.status(400).json({ error: "Please enter your full three-part name (e.g., youssef miro soshi). First name only is not accepted." });
-    return;
-  }
-
-  const trimmedName = name.trim();
+  const trimmedEmail = email.trim();
   const trimmedPassword = password.trim();
 
   try {
-    // Check if user exists with this name (require three-part name match)
-    const nameParts = trimmedName.split(/\s+/);
-    let user;
-    
-    // Special handling for sofsafaSVS account
-    if (trimmedName.toLowerCase() === 'sofsafasvs') {
-      console.log("Attempting sofsafaSVS admin login");
-      user = await UserModel.findOne({ firstName: 'sofsafaSVS' });
-      console.log("Found user with firstName 'sofsafaSVS':", user ? "Yes" : "No");
-      
-      if (!user) {
-        user = await UserModel.findOne({ firstName: 'sofsafasvs' });
-        console.log("Found user with firstName 'sofsafasvs':", user ? "Yes" : "No");
-      }
-      
-      if (!user) {
-        // Try finding by email as fallback
-        user = await UserModel.findOne({ email: 'sofsafaSVS' });
-        console.log("Found user with email 'sofsafaSVS':", user ? "Yes" : "No");
-      }
-      
-      if (!user) {
-        console.log("sofsafaSVS user not found in database");
-        res.status(404).json({ error: "Admin account not found. Please create the sofsafaSVS admin account first." });
-        return;
-      }
-      
-      // Check if user is banned
-      if (user.status === "banned") {
-        res.status(403).json({ error: "This account has been banned" });
-        return;
-      }
-      
-      console.log("sofsafaSVS user found:", user.firstName, user.email);
-    } else {
-      // Regular three-part name handling for other users
-      // Try exact match with firstName + lastName (which contains middle + last)
-      // This is the preferred method since users are required to enter three-part names
-      user = await UserModel.findOne({ 
-        $expr: { $eq: [{ $concat: ["$firstName", " ", "$lastName"] }, trimmedName] } 
-      });
-      
-      // If not found with exact match, try matching just the first name
-      // This provides a fallback for users who might enter their name differently
-      if (!user) {
-        user = await UserModel.findOne({ firstName: nameParts[0] });
-      }
-      
-      if (!user) {
-        res.status(404).json({ error: "User not found. Please submit an access request first. Make sure to enter your full three-part name (e.g., youssef miro soshi)." });
-        return;
-      }
+    // Find user by email or phone
+    let user = await UserModel.findOne({ email: trimmedEmail });
+    if (!user) {
+      user = await UserModel.findOne({ phone: trimmedEmail });
     }
 
-    // Check password matches (in production, use proper password hashing)
-    if (user.password !== trimmedPassword) {
+    if (!user) {
+      res.status(404).json({ error: "User not found with this email or phone. Please submit an access request first." });
+      return;
+    }
+
+    // Check password matches (supports both hashed and legacy plaintext passwords)
+    if (!verifyPassword(trimmedPassword, user.password ?? "")) {
       res.status(401).json({ error: "Invalid password" });
       return;
     }
@@ -383,7 +526,7 @@ router.post("/users/create-admin", async (req, res) => {
       firstName: name,
       lastName: "Admin",
       email: email,
-      password: password, // In production, this should be hashed
+      password: hashPassword(password),
       phone: "0000000000", // Temporary phone number
       section: "كشافة", // Default section
       team: "A", // Default team
@@ -631,9 +774,9 @@ router.post("/users/update-admin-password", async (req, res) => {
       return;
     }
 
-    user.password = newPassword;
+    user.password = hashPassword(newPassword);
     user.updatedAt = new Date();
-    await user.save();
+    await user.save({ validateBeforeSave: false });
 
     console.log(`Password updated for user: ${email}`);
     res.json({ message: "Password updated successfully", email: email });

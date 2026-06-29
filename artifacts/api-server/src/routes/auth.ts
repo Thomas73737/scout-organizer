@@ -70,7 +70,7 @@ async function upsertUser(claims: Record<string, unknown>) {
     id: claims.sub as string,
     firstName: (claims.first_name as string) || undefined,
     lastName: (claims.last_name as string) || undefined,
-    profileImageUrl: (claims.profile_image_url || claims.picture) as string | undefined,
+    phone: (claims.phone_number as string) || "0000000000",
     updatedAt: new Date(),
   };
 
@@ -79,9 +79,16 @@ async function upsertUser(claims: Record<string, unknown>) {
     userData.email = claims.email as string;
   }
 
+  // Only set profileImageUrl from OIDC on user creation, not on every login,
+  // so that users can remove/change their profile picture without it being overwritten
+  const oidcProfileImageUrl = (claims.profile_image_url || claims.picture) as string | undefined;
+
   const user = await UserModel.findOneAndUpdate(
     { id: userData.id },
-    userData,
+    {
+      $set: userData,
+      ...(oidcProfileImageUrl ? { $setOnInsert: { profileImageUrl: oidcProfileImageUrl } } : {}),
+    },
     { upsert: true, new: true }
   );
   return user;
@@ -208,10 +215,10 @@ router.get("/callback", async (req: Request, res: Response) => {
   const sessionData: SessionData = {
     user: {
       id: dbUser.id,
-      email: dbUser.email,
-      firstName: dbUser.firstName,
-      lastName: dbUser.lastName,
-      profileImageUrl: dbUser.profileImageUrl,
+      email: dbUser.email ?? null,
+      firstName: dbUser.firstName ?? null,
+      lastName: dbUser.lastName ?? null,
+      profileImageUrl: dbUser.profileImageUrl ?? null,
     },
     access_token: tokens.access_token,
     refresh_token: tokens.refresh_token,

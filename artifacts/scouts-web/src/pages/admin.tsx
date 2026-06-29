@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Shield, Users, Trash2 } from "lucide-react";
+import { Shield, Users, Trash2, Download, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -20,6 +20,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export default function Admin() {
   const { data: users, isLoading } = useListUsers();
@@ -120,7 +126,9 @@ export default function Admin() {
   const [requests, setRequests] = useState<Array<{
     id: string;
     name: string;
+    email?: string;
     phone: string;
+    section?: string;
     team: string;
     status: string;
     createdAt: string;
@@ -128,9 +136,18 @@ export default function Admin() {
     whatsappNumber?: string;
     parentsWhatsappNumber?: string;
     homeAddress?: string;
+    nationalId?: string;
     photoUrl?: string;
+    parentNationalIdPhotoUrl?: string;
     patrol?: string;
   }>>([]);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+
+  const fixImageUrl = (url: string | undefined) => {
+    if (!url) return undefined;
+    if (url.startsWith("/objects/")) return `/api/storage${url}`;
+    return url;
+  };
   const [requestsLoading, setRequestsLoading] = useState(true);
   const [requestActionPending, setRequestActionPending] = useState<string | null>(null);
 
@@ -214,6 +231,27 @@ export default function Admin() {
   const patrols = ["صقر", "فهد", "ثعلب", "ذئب", "نمر", "نسر", "أسد", "غراب", "بلبل", "ديك", "خفاش", "غزال"];
   const isDeveloper = currentUser?.role === "developer" || currentUser?.role === "leader";
 
+  const handleExportData = async () => {
+    try {
+      const res = await fetch("/api/access-requests/export", {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to export data");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "scout-requests.xlsx";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast({ title: "Data exported successfully" });
+    } catch {
+      toast({ title: "Failed to export data", variant: "destructive" });
+    }
+  };
+
   return (
     <div className="space-y-6" data-testid="admin-page">
       <div>
@@ -224,7 +262,7 @@ export default function Admin() {
         <p className="text-muted-foreground text-sm mt-1">Manage member roles and permissions</p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-5 flex items-center gap-3">
             <Users className="h-5 w-5 text-secondary" />
@@ -256,7 +294,15 @@ export default function Admin() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">New Scout Requests / طلبات الكشافة الجدد</CardTitle>
+          <div className="flex items-center justify-between gap-4">
+            <CardTitle className="text-base">New Scout Requests / طلبات الكشافة الجدد</CardTitle>
+            {requests.filter(r => r.isNewScout).length > 0 && (
+              <Button variant="outline" size="sm" onClick={handleExportData} className="shrink-0 gap-1.5">
+                <Download className="h-4 w-4" />
+                Export Data
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {requestsLoading ? (
@@ -269,10 +315,16 @@ export default function Admin() {
             <div className="space-y-3">
               {requests.filter(r => r.isNewScout).map((request) => (
                 <div key={request.id} className="rounded-lg border border-border p-4 bg-background">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
                       <p className="font-medium text-foreground">{request.name}</p>
-                      <p className="text-sm text-muted-foreground">{request.phone} • {request.team}</p>
+                      <p className="text-sm text-muted-foreground">{request.phone} • Section: {request.section} • Team: {request.team}</p>
+                      {request.email && (
+                        <p className="text-xs text-muted-foreground">Email: {request.email}</p>
+                      )}
+                      {request.nationalId && (
+                        <p className="text-xs text-muted-foreground">National ID: {request.nationalId}</p>
+                      )}
                       {request.patrol && (
                         <p className="text-xs text-muted-foreground">Patrol: {request.patrol}</p>
                       )}
@@ -290,11 +342,39 @@ export default function Admin() {
                       {request.status}
                     </Badge>
                   </div>
-                  {request.photoUrl && (
-                    <div className="mt-2">
-                      <img src={request.photoUrl} alt={request.name} className="w-16 h-16 rounded-lg object-cover" />
-                    </div>
-                  )}
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    {request.photoUrl && (
+                      <button
+                        onClick={() => setPreviewImage(fixImageUrl(request.photoUrl))}
+                        className="group relative"
+                      >
+                        <img
+                          src={fixImageUrl(request.photoUrl)}
+                          alt={request.name}
+                          className="w-16 h-16 rounded-lg object-cover border border-border group-hover:ring-2 group-hover:ring-primary transition-all"
+                        />
+                        <div className="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <Eye className="h-5 w-5 text-white" />
+                        </div>
+                      </button>
+                    )}
+                    {request.parentNationalIdPhotoUrl && (
+                      <button
+                        onClick={() => setPreviewImage(fixImageUrl(request.parentNationalIdPhotoUrl))}
+                        className="group relative"
+                      >
+                        <img
+                          src={fixImageUrl(request.parentNationalIdPhotoUrl)}
+                          alt="Parent National ID"
+                          className="w-16 h-16 rounded-lg object-cover border border-border group-hover:ring-2 group-hover:ring-primary transition-all"
+                        />
+                        <div className="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <Eye className="h-5 w-5 text-white" />
+                        </div>
+                        <span className="text-[10px] text-muted-foreground block text-center mt-0.5">ID Photo</span>
+                      </button>
+                    )}
+                  </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Button
                       variant="secondary"
@@ -386,7 +466,7 @@ export default function Admin() {
           ) : (
             <div className="divide-y divide-border">
               {users?.map((user) => (
-                <div key={user.id} className="flex items-center justify-between py-3 gap-3" data-testid={`user-row-${user.id}`}>
+                <div key={user.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-3 gap-2" data-testid={`user-row-${user.id}`}>
                   <div className="flex items-center gap-3 min-w-0">
                     <Avatar className="h-9 w-9 shrink-0">
                       {user.profileImageUrl && (
@@ -405,13 +485,13 @@ export default function Admin() {
                       )}
                     </div>
                   </div>
-                  <div className="shrink-0 flex gap-2">
+                  <div className="flex flex-wrap gap-1.5">
                     <Select
                       value={user.role}
                       onValueChange={(val) => handleRoleChange(user.replitId, val as "scout" | "leader" | "developer")}
                       disabled={updateRoleMutation.isPending}
                     >
-                      <SelectTrigger className="w-32 h-8 text-xs" data-testid={`select-role-${user.id}`}>
+                      <SelectTrigger className="w-28 sm:w-32 h-8 text-xs" data-testid={`select-role-${user.id}`}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -425,7 +505,7 @@ export default function Admin() {
                       onValueChange={(val) => updatePatrolMutation.mutate({ userId: user.replitId, patrol: val })}
                       disabled={updatePatrolMutation.isPending}
                     >
-                      <SelectTrigger className="w-32 h-8 text-xs">
+                      <SelectTrigger className="w-20 sm:w-32 h-8 text-xs">
                         <SelectValue placeholder="Patrol" />
                       </SelectTrigger>
                       <SelectContent>
@@ -437,7 +517,7 @@ export default function Admin() {
                     <Button
                       size="sm"
                       variant="destructive"
-                      className="h-8 text-xs"
+                      className="h-8 text-xs px-2 sm:px-3"
                       onClick={() => banUserMutation.mutate(user.replitId)}
                       disabled={banUserMutation.isPending}
                     >
@@ -446,7 +526,7 @@ export default function Admin() {
                     <Button
                       size="sm"
                       variant="outline"
-                      className="h-8 text-xs"
+                      className="h-8 text-xs px-2 sm:px-3"
                       onClick={() => unbanUserMutation.mutate(user.replitId)}
                       disabled={unbanUserMutation.isPending}
                     >
@@ -456,12 +536,12 @@ export default function Admin() {
                       <Button
                         size="sm"
                         variant="destructive"
-                        className="h-8 text-xs"
+                        className="h-8 text-xs px-2 sm:px-3"
                         onClick={() => handleDeleteUser(user.replitId)}
                         disabled={deleteUserMutation.isPending}
                       >
-                        <Trash2 className="h-3 w-3 mr-1" />
-                        Delete
+                        <Trash2 className="h-3 w-3 sm:mr-1" />
+                        <span className="hidden sm:inline">Delete</span>
                       </Button>
                     )}
                   </div>
@@ -471,6 +551,19 @@ export default function Admin() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={previewImage !== null} onOpenChange={(open) => !open && setPreviewImage(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Photo Preview</DialogTitle>
+          </DialogHeader>
+          {previewImage && (
+            <div className="flex items-center justify-center p-2">
+              <img src={previewImage} alt="Preview" className="max-h-[70vh] w-auto rounded-lg object-contain" />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>

@@ -192,6 +192,36 @@ router.post("/attendance/sessions/:sessionId/records", async (req, res) => {
   res.json({ ...session?.toObject(), records: enrichedRecords });
 });
 
+router.delete("/attendance/sessions/:sessionId/records/:userId", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const hasAccess = await isDeveloperOrLeader(req.user.id);
+  if (!hasAccess) {
+    res.status(403).json({ error: "Leaders and developers only" });
+    return;
+  }
+
+  const { sessionId, userId } = req.params;
+  if (!sessionId || !userId) {
+    res.status(400).json({ error: "Invalid session ID or user ID" });
+    return;
+  }
+
+  try {
+    const result = await AttendanceRecordModel.deleteOne({ sessionId, userId });
+    if (result.deletedCount === 0) {
+      res.status(404).json({ error: "Attendance record not found" });
+      return;
+    }
+    res.json({ message: "Attendance record deleted successfully" });
+  } catch (err: any) {
+    console.error("Failed to delete attendance record:", err?.message ?? err);
+    res.status(500).json({ error: "Failed to delete attendance record" });
+  }
+});
+
 router.get("/attendance/my-summary", async (req, res) => {
   if (!req.isAuthenticated()) {
     res.status(401).json({ error: "Unauthorized" });

@@ -7,6 +7,7 @@ import accessRequestsRouter from "./accessRequests";
 import attendanceRouter from "./attendance";
 import announcementsRouter from "./announcements";
 import postsRouter from "./posts";
+import notificationsRouter from "./notifications";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(accessRequestsRouter);
 router.use(attendanceRouter);
 router.use(announcementsRouter);
 router.use(postsRouter);
+router.use(notificationsRouter);
 
 export default router;

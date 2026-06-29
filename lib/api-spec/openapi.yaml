@@ -213,7 +213,7 @@ paths:
           in: path
           required: true
           schema:
-            type: integer
+            type: string
       responses:
         '200':
           description: Session detail with records
@@ -232,7 +232,7 @@ paths:
           in: path
           required: true
           schema:
-            type: integer
+            type: string
       requestBody:
         required: true
         content:
@@ -460,6 +460,8 @@ components:
           type: ["string", "null"]
         profileImageUrl:
           type: ["string", "null"]
+        patrol:
+          type: ["string", "null"]
         role:
           type: string
           enum: [scout, leader, developer]
@@ -477,11 +479,13 @@ components:
 
     UserStats:
       type: object
-      required: [totalScouts, totalLeaders, totalMembers]
+      required: [totalScouts, totalLeaders, totalDevelopers, totalMembers]
       properties:
         totalScouts:
           type: integer
         totalLeaders:
+          type: integer
+        totalDevelopers:
           type: integer
         totalMembers:
           type: integer

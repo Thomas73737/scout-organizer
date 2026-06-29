@@ -52,7 +52,7 @@ export default defineConfig(async ({ mode }) => {
     port,
     strictPort: true,
     host: "0.0.0.0",
-    allowedHosts: "all",
+    allowedHosts: true,
     proxy: {
       "/api": {
         target: env.VITE_API_URL || "http://localhost:5000",
@@ -67,7 +67,7 @@ export default defineConfig(async ({ mode }) => {
   preview: {
     port,
     host: "0.0.0.0",
-    allowedHosts: "all",
+    allowedHosts: true,
     proxy: {
       "/api": {
         target: env.VITE_API_URL || "http://localhost:5000",

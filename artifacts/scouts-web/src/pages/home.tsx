@@ -18,7 +18,7 @@ export default function Home() {
   return (
     <div className="space-y-8" data-testid="home-page">
       {/* Welcome Banner */}
-      <div className="bg-primary text-primary-foreground rounded-xl p-8 shadow-md">
+      <div className="bg-primary text-primary-foreground rounded-xl p-6 sm:p-8 shadow-md">
         {profileLoading ? (
           <Skeleton className="h-8 w-64 bg-primary-foreground/20" />
         ) : (
@@ -38,7 +38,7 @@ export default function Home() {
 
       {/* Stats Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card data-testid="stat-members">
+        <Card className="col-span-2 md:col-span-1" data-testid="stat-members">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-primary/10 rounded-lg">

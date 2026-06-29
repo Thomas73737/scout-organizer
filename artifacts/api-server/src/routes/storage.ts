@@ -34,7 +34,7 @@ router.post("/storage/uploads/request-url", async (req: Request, res: Response) 
   try {
     const { name, size, contentType } = parsed.data;
 
-    const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+    const uploadURL = await objectStorageService.getObjectEntityUploadURL({ name });
     const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
 
     res.json(
@@ -64,7 +64,8 @@ router.put("/storage/local-upload/:objectId", async (req: Request, res: Response
 
   try {
     const objectId = req.params.objectId;
-    const filePath = path.join(LOCAL_UPLOADS_DIR, objectId);
+    const filePath = path.join(LOCAL_UPLOADS_DIR, objectId as string);
+    const fileName = req.query.filename as string | undefined;
 
     // Ensure directory exists
     if (!fs.existsSync(LOCAL_UPLOADS_DIR)) {
@@ -76,6 +77,14 @@ router.put("/storage/local-upload/:objectId", async (req: Request, res: Response
     req.pipe(fileStream);
 
     fileStream.on('finish', () => {
+      // Save original filename as sidecar metadata
+      if (fileName) {
+        try {
+          fs.writeFileSync(filePath + '.meta', JSON.stringify({ originalName: fileName }), 'utf-8');
+        } catch (metaErr) {
+          req.log.error({ err: metaErr }, "Error saving file metadata");
+        }
+      }
       res.json({ success: true, objectPath: `/objects/uploads/${objectId}` });
     });
 

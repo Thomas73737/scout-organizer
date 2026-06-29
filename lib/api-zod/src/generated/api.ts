@@ -172,7 +172,7 @@ export const CreateAttendanceSessionResponse = zod.object({
  * @summary Get a session with all scout attendance records
  */
 export const GetAttendanceSessionParams = zod.object({
-  "sessionId": zod.coerce.number()
+  "sessionId": zod.string()
 })
 
 export const GetAttendanceSessionResponse = zod.object({
@@ -194,7 +194,7 @@ export const GetAttendanceSessionResponse = zod.object({
  * @summary Submit attendance records for a session (leader only)
  */
 export const SubmitAttendanceRecordsParams = zod.object({
-  "sessionId": zod.coerce.number()
+  "sessionId": zod.string()
 })
 
 export const SubmitAttendanceRecordsBody = zod.object({

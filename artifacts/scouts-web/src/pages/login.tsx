@@ -17,19 +17,36 @@ export default function Login() {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [loginName, setLoginName] = useState("");
+  const [loginEmail, setLoginEmail] = useState("");
   const [isNewScout, setIsNewScout] = useState<boolean | null>(null);
-  const [whatsappNumber, setWhatsappNumber] = useState("");
+  const [nationalId, setNationalId] = useState("");
   const [parentsWhatsappNumber, setParentsWhatsappNumber] = useState("");
   const [homeAddress, setHomeAddress] = useState("");
   const [patrol, setPatrol] = useState("");
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
+  const [parentNationalIdPhoto, setParentNationalIdPhoto] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const uploadUrlMutation = useRequestUploadUrl();
 
   const sections = ["سنافر", "اشبال", "زهرات", "كشافة", "مرشدات"];
   const teams = ["A", "B"];
   const patrols = ["صقر", "فهد", "ثعلب", "ذئب", "نمر", "نسر", "أسد", "غراب", "بلبل", "ديك", "خفاش", "غزال"];
+
+  const handleParentNationalIdSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] ?? null;
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        setError("Please select an image file (JPG, PNG, etc.)");
+        return;
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        setError("File size must be less than 5MB");
+        return;
+      }
+      setParentNationalIdPhoto(file);
+      setError(null);
+    }
+  };
 
   const handlePhotoSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0] ?? null;
@@ -49,14 +66,12 @@ export default function Login() {
     }
   };
 
-  const uploadPhoto = async (): Promise<string | null> => {
-    if (!selectedPhoto) return null;
-
+  const uploadFile = async (file: File): Promise<string | null> => {
     setIsUploading(true);
     try {
       const urlResult = await new Promise<{ uploadURL: string; objectPath: string }>((resolve, reject) => {
         uploadUrlMutation.mutate(
-          { data: { name: selectedPhoto.name, size: selectedPhoto.size, contentType: selectedPhoto.type } },
+          { data: { name: file.name, size: file.size, contentType: file.type } },
           {
             onSuccess: resolve,
             onError: reject,
@@ -64,26 +79,22 @@ export default function Login() {
         );
       });
 
-      // Handle both local and cloud upload URLs
       if (urlResult.uploadURL.includes('local-upload')) {
-        // Local development upload
         await fetch(urlResult.uploadURL, {
           method: "PUT",
-          body: selectedPhoto,
+          body: file,
         });
       } else {
-        // Cloud storage upload
         await fetch(urlResult.uploadURL, {
           method: "PUT",
-          body: selectedPhoto,
-          headers: { "Content-Type": selectedPhoto.type },
+          body: file,
+          headers: { "Content-Type": file.type },
         });
       }
 
       return urlResult.objectPath;
     } catch (error) {
-      console.error("Photo upload error:", error);
-      setError("Failed to upload photo. Please try again.");
+      console.error("Upload error:", error);
       return null;
     } finally {
       setIsUploading(false);
@@ -96,7 +107,11 @@ export default function Login() {
     setStatus(null);
 
     if (mode === "request") {
-      if (!name || !email || !password || !phone || !section || !team || isNewScout === null) {
+      if (!name || !email || !password || !phone || !section || isNewScout === null) {
+        setError("Please fill in all fields.");
+        return;
+      }
+      if (!isNewScout && !team) {
         setError("Please fill in all fields.");
         return;
       }
@@ -110,8 +125,12 @@ export default function Login() {
       
       // Validate new scout fields
       if (isNewScout) {
-        if (!whatsappNumber || !parentsWhatsappNumber || !homeAddress || !selectedPhoto) {
+        if (!nationalId || !parentsWhatsappNumber || !homeAddress || !selectedPhoto || !parentNationalIdPhoto) {
           setError("Please fill in all new scout fields including photo.");
+          return;
+        }
+        if (!/^\d{14}$/.test(nationalId)) {
+          setError("الرقم القومي must be exactly 14 digits");
           return;
         }
       }
@@ -122,16 +141,8 @@ export default function Login() {
         return;
       }
     } else {
-      if (!loginName || !password) {
-        setError("Please fill in name and password.");
-        return;
-      }
-      
-      // Validate three-part name for login - reject if only first name
-      // Exception: sofsafaSVS account can login with first name only
-      const loginNameParts = loginName.trim().split(/\s+/);
-      if (loginNameParts.length < 3 && loginName.toLowerCase() !== 'sofsafasvs') {
-        setError("Please enter your full three-part name (e.g., youssef miro soshi). First name only is not accepted.");
+      if (!loginEmail || !password) {
+        setError("Please fill in email/phone and password.");
         return;
       }
     }
@@ -144,7 +155,7 @@ export default function Login() {
         const loginResponse = await fetch("/api/users/login", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: loginName, password }),
+          body: JSON.stringify({ email: loginEmail, password }),
           credentials: "include",
         });
 
@@ -174,13 +185,25 @@ export default function Login() {
         
         throw new Error(loginError.error || "Login failed. Please check your credentials.");
       } else {
-        // Upload photo first if it's a new scout
-        let uploadedPhotoUrl: string | undefined;
-        if (isNewScout && selectedPhoto) {
-          uploadedPhotoUrl = await uploadPhoto();
-          if (!uploadedPhotoUrl) {
-            setIsSubmitting(false);
-            return;
+        // Upload files first if it's a new scout
+        let uploadedPhotoUrl: string | null = null;
+        let uploadedParentNationalIdUrl: string | null = null;
+        if (isNewScout) {
+          if (selectedPhoto) {
+            uploadedPhotoUrl = await uploadFile(selectedPhoto);
+            if (!uploadedPhotoUrl) {
+              setError("Failed to upload photo. Please try again.");
+              setIsSubmitting(false);
+              return;
+            }
+          }
+          if (parentNationalIdPhoto) {
+            uploadedParentNationalIdUrl = await uploadFile(parentNationalIdPhoto);
+            if (!uploadedParentNationalIdUrl) {
+              setError("Failed to upload parent national ID. Please try again.");
+              setIsSubmitting(false);
+              return;
+            }
           }
         }
 
@@ -194,12 +217,13 @@ export default function Login() {
             password, 
             phone, 
             section, 
-            team, 
+            team: isNewScout ? undefined : team, 
             isNewScout,
-            whatsappNumber: isNewScout ? whatsappNumber : undefined,
+            nationalId: isNewScout ? nationalId : undefined,
             parentsWhatsappNumber: isNewScout ? parentsWhatsappNumber : undefined,
             homeAddress: isNewScout ? homeAddress : undefined,
             photoUrl: isNewScout ? uploadedPhotoUrl : undefined,
+            parentNationalIdPhotoUrl: isNewScout ? uploadedParentNationalIdUrl : undefined,
             patrol: patrol
           }),
         });
@@ -223,11 +247,12 @@ export default function Login() {
         setSection("");
         setTeam("");
         setIsNewScout(null);
-        setWhatsappNumber("");
+        setNationalId("");
         setParentsWhatsappNumber("");
         setHomeAddress("");
         setPatrol("");
         setSelectedPhoto(null);
+        setParentNationalIdPhoto(null);
         
         setTimeout(() => {
           setLocation("/waiting");
@@ -249,7 +274,7 @@ export default function Login() {
         <div className="absolute bottom-[-10%] left-[-5%] w-[40%] h-[40%] rounded-full bg-secondary blur-[100px]"></div>
       </div>
 
-      <div className="w-full max-w-md bg-card border border-border shadow-xl rounded-xl p-8 flex flex-col items-center text-center">
+      <div className="w-full max-w-md bg-card border border-border shadow-xl rounded-xl p-6 sm:p-8 flex flex-col items-center text-center">
         <div className="w-20 h-20 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-6">
           <Tent className="w-10 h-10" />
         </div>
@@ -268,7 +293,7 @@ export default function Login() {
               onClick={() => {
                 setMode("request");
                 setPassword("");
-                setLoginName("");
+                setLoginEmail("");
               }}
               className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                 mode === "request" 
@@ -283,7 +308,7 @@ export default function Login() {
               onClick={() => {
                 setMode("login");
                 setPassword("");
-                setLoginName("");
+                setLoginEmail("");
               }}
               className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                 mode === "login" 
@@ -312,7 +337,7 @@ export default function Login() {
               <>
                 <div className="space-y-2 text-left">
                   <label className="block text-sm font-medium text-foreground">Are you new to Scouting? / هل أنت جديد في الكشافة؟</label>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <button
                       type="button"
                       onClick={() => setIsNewScout(true)}
@@ -368,7 +393,7 @@ export default function Login() {
                 </div>
 
                 <div className="space-y-2 text-left">
-                  <label className="block text-sm font-medium text-foreground">Phone / رقم الهاتف</label>
+                  <label className="block text-sm font-medium text-foreground">Phone number with WhatsApp / رقم الهاتف مع واتساب</label>
                   <Input
                     value={phone}
                     onChange={(event) => setPhone(event.target.value)}
@@ -391,20 +416,22 @@ export default function Login() {
                   </select>
                 </div>
 
-                <div className="space-y-2 text-left">
-                  <label className="block text-sm font-medium text-foreground">Team / الفريق</label>
-                  <select
-                    value={team}
-                    onChange={(event) => setTeam(event.target.value)}
-                    className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground"
-                    required
-                  >
-                    <option value="">Select team</option>
-                    {teams.map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                </div>
+                {!isNewScout && (
+                  <div className="space-y-2 text-left">
+                    <label className="block text-sm font-medium text-foreground">Team / الفريق</label>
+                    <select
+                      value={team}
+                      onChange={(event) => setTeam(event.target.value)}
+                      className="w-full px-3 py-2 border border-border rounded-md bg-background text-foreground"
+                      required
+                    >
+                      <option value="">Select team</option>
+                      {teams.map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 {!isNewScout && (
                   <div className="space-y-2 text-left">
@@ -426,15 +453,6 @@ export default function Login() {
                 {isNewScout && (
                   <>
                     <div className="space-y-2 text-left">
-                      <label className="block text-sm font-medium text-foreground">WhatsApp Number / رقم الواتساب</label>
-                      <Input
-                        value={whatsappNumber}
-                        onChange={(event) => setWhatsappNumber(event.target.value)}
-                        placeholder="e.g. +201234567890"
-                      />
-                    </div>
-
-                    <div className="space-y-2 text-left">
                       <label className="block text-sm font-medium text-foreground">Parents WhatsApp Number / رقم واتساب الوالدين</label>
                       <Input
                         value={parentsWhatsappNumber}
@@ -450,6 +468,65 @@ export default function Login() {
                         onChange={(event) => setHomeAddress(event.target.value)}
                         placeholder="e.g. 123 Main Street, Cairo"
                       />
+                    </div>
+
+                    <div className="space-y-2 text-left">
+                      <label className="block text-sm font-medium text-foreground">الرقم القومي / National ID</label>
+                      <Input
+                        value={nationalId}
+                        onChange={(event) => setNationalId(event.target.value)}
+                        placeholder="e.g. 12345678901234"
+                      />
+                    </div>
+
+                    <div className="space-y-2 text-left">
+                      <label className="block text-sm font-medium text-foreground">صورة بطاقة الرقم القومي للوالد / Parent National ID Card</label>
+                      <div className="space-y-2">
+                        {!parentNationalIdPhoto ? (
+                          <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-border rounded-lg cursor-pointer hover:border-primary transition-colors bg-muted/30">
+                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                              <Upload className="w-8 h-8 text-muted-foreground mb-2" />
+                              <p className="text-sm text-muted-foreground">
+                                <span className="font-medium">Click to upload</span> or drag and drop
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                PNG, JPG up to 5MB
+                              </p>
+                            </div>
+                            <input
+                              type="file"
+                              className="hidden"
+                              accept="image/*"
+                              onChange={handleParentNationalIdSelect}
+                            />
+                          </label>
+                        ) : (
+                          <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border border-border">
+                            <div className="w-12 h-12 rounded-lg overflow-hidden bg-background">
+                              <img
+                                src={URL.createObjectURL(parentNationalIdPhoto)}
+                                alt="Preview"
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-foreground truncate">
+                                {parentNationalIdPhoto.name}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {(parentNationalIdPhoto.size / 1024 / 1024).toFixed(2)} MB
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setParentNationalIdPhoto(null)}
+                              className="p-1 hover:bg-destructive/10 rounded-md transition-colors"
+                            >
+                              <X className="w-4 h-4 text-destructive" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     <div className="space-y-2 text-left">
@@ -509,12 +586,12 @@ export default function Login() {
             {mode === "login" && (
               <>
                 <div className="space-y-2 text-left">
-                  <label className="block text-sm font-medium text-foreground">Name / الاسم</label>
+                  <label className="block text-sm font-medium text-foreground">Email or Phone / البريد الإلكتروني أو رقم الهاتف</label>
                   <Input
                     type="text"
-                    value={loginName}
-                    onChange={(event) => setLoginName(event.target.value)}
-                    placeholder="e.g. youssef miro soshi"
+                    value={loginEmail}
+                    onChange={(event) => setLoginEmail(event.target.value)}
+                    placeholder="e.g. john@example.com or +201234567890"
                   />
                 </div>
 

@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
+import * as XLSX from "xlsx";
+import { hashPassword } from "../lib/password";
 import {
   AccessRequestModel,
   UserModel,
@@ -22,10 +24,11 @@ router.post("/access-requests", async (req, res) => {
     section, 
     team, 
     isNewScout,
-    whatsappNumber,
+    nationalId,
     parentsWhatsappNumber,
     homeAddress,
     photoUrl,
+    parentNationalIdPhotoUrl,
     patrol
   } = req.body as {
     name?: string;
@@ -35,15 +38,20 @@ router.post("/access-requests", async (req, res) => {
     section?: string;
     team?: string;
     isNewScout?: boolean;
-    whatsappNumber?: string;
+    nationalId?: string;
     parentsWhatsappNumber?: string;
     homeAddress?: string;
     photoUrl?: string;
+    parentNationalIdPhotoUrl?: string;
     patrol?: string;
   };
 
-  if (!name || !email || !password || !phone || !section || !team || typeof isNewScout !== 'boolean') {
-    res.status(400).json({ error: "name, email, password, phone, section, team, and isNewScout are required" });
+  if (!name || !email || !password || !phone || !section || typeof isNewScout !== 'boolean') {
+    res.status(400).json({ error: "name, email, password, phone, section, and isNewScout are required" });
+    return;
+  }
+  if (!isNewScout && !team) {
+    res.status(400).json({ error: "team is required for existing scouts" });
     return;
   }
 
@@ -56,8 +64,8 @@ router.post("/access-requests", async (req, res) => {
 
   // Validate new scout fields
   if (isNewScout) {
-    if (!whatsappNumber || !parentsWhatsappNumber || !homeAddress || !photoUrl) {
-      res.status(400).json({ error: "whatsappNumber, parentsWhatsappNumber, homeAddress, and photoUrl are required for new scouts" });
+    if (!nationalId || !parentsWhatsappNumber || !homeAddress || !photoUrl) {
+      res.status(400).json({ error: "nationalId, parentsWhatsappNumber, homeAddress, and photoUrl are required for new scouts" });
       return;
     }
     // Patrol is not required for new scouts
@@ -78,7 +86,7 @@ router.post("/access-requests", async (req, res) => {
     return;
   }
 
-  if (!validTeams.includes(team.toUpperCase())) {
+  if (team && !validTeams.includes(team.toUpperCase())) {
     res.status(400).json({ error: "Invalid team. Must be A or B" });
     return;
   }
@@ -88,7 +96,7 @@ router.post("/access-requests", async (req, res) => {
     return;
   }
 
-  const trimmedTeam = team.toUpperCase();
+  const trimmedTeam = team?.toUpperCase();
 
   try {
     // Check if user already exists by email or phone
@@ -108,14 +116,15 @@ router.post("/access-requests", async (req, res) => {
       firstName: nameParts[0], // First name
       lastName: nameParts.slice(1).join(" "), // Middle and last names combined
       email: email.trim(),
-      password: password, // In production, this should be hashed
+      password: hashPassword(password),
       phone: phone.trim(),
       section: section,
       team: trimmedTeam,
       profileImageUrl: isNewScout ? photoUrl : undefined,
-      whatsappNumber: isNewScout ? whatsappNumber : undefined,
+      nationalId: isNewScout ? nationalId : undefined,
       parentsWhatsappNumber: isNewScout ? parentsWhatsappNumber : undefined,
       homeAddress: isNewScout ? homeAddress : undefined,
+      parentNationalIdPhotoUrl: isNewScout ? parentNationalIdPhotoUrl : undefined,
       patrol: patrol || undefined, // Save patrol only if provided
       status: "pending",
     });
@@ -125,15 +134,16 @@ router.post("/access-requests", async (req, res) => {
       id: randomUUID(),
       name: name.trim(),
       email: email.trim(),
-      password: password,
+      password: hashPassword(password),
       phone: phone.trim(),
       section: section,
       team: trimmedTeam,
       isNewScout,
-      whatsappNumber: isNewScout ? whatsappNumber : undefined,
+      nationalId: isNewScout ? nationalId : undefined,
       parentsWhatsappNumber: isNewScout ? parentsWhatsappNumber : undefined,
       homeAddress: isNewScout ? homeAddress : undefined,
       photoUrl: isNewScout ? photoUrl : undefined,
+      parentNationalIdPhotoUrl: isNewScout ? parentNationalIdPhotoUrl : undefined,
       patrol: patrol || undefined, // Save patrol only if provided
       status: "pending",
     });
@@ -277,6 +287,57 @@ router.post("/access-requests/:requestId/deny", async (req, res) => {
   } catch (err: any) {
     console.error("Failed to deny request:", err?.message ?? err);
     res.status(500).json({ error: err?.message ?? "Internal server error" });
+  }
+});
+
+router.get("/access-requests/export", async (req, res) => {
+  if (!(req as any).isAuthenticated?.()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  if (!(await ensureLeaderOrDeveloper((req as any).user?.id))) {
+    res.status(403).json({ error: "Leaders only" });
+    return;
+  }
+
+  try {
+    const requests = await AccessRequestModel.find({ isNewScout: true })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const data = requests.map((r, i) => ({
+      "#": i + 1,
+      "Name": r.name || "",
+      "Email": r.email || "",
+      "Phone": r.phone || "",
+      "Section": r.section || "",
+      "Team": r.team || "",
+      "WhatsApp": r.whatsappNumber || "",
+      "Parents WhatsApp": r.parentsWhatsappNumber || "",
+      "Home Address": r.homeAddress || "",
+      "National ID": r.nationalId || "",
+      "Patrol": r.patrol || "",
+      "Status": r.status || "",
+      "Submitted At": r.createdAt ? new Date(r.createdAt).toLocaleString("en-GB") : "",
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(data);
+
+    const colWidths = Object.keys(data[0] || {}).map(() => ({ wch: 20 }));
+    ws["!cols"] = colWidths;
+
+    XLSX.utils.book_append_sheet(wb, ws, "New Scout Requests");
+
+    const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="scout-requests-${Date.now()}.xlsx"`);
+    res.send(buf);
+  } catch (err: any) {
+    console.error("Failed to export requests:", err?.message ?? err);
+    res.status(500).json({ error: "Failed to export data" });
   }
 });
 

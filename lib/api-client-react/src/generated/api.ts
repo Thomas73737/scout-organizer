@@ -916,7 +916,7 @@ export const useCreateAttendanceSession = <TError = ErrorType<unknown>,
       return useMutation(getCreateAttendanceSessionMutationOptions(options));
     }
 
-export const getGetAttendanceSessionUrl = (sessionId: number,) => {
+export const getGetAttendanceSessionUrl = (sessionId: string,) => {
 
 
 
@@ -927,7 +927,7 @@ export const getGetAttendanceSessionUrl = (sessionId: number,) => {
 /**
  * @summary Get a session with all scout attendance records
  */
-export const getAttendanceSession = async (sessionId: number, options?: RequestInit): Promise<AttendanceSessionDetail> => {
+export const getAttendanceSession = async (sessionId: string, options?: RequestInit): Promise<AttendanceSessionDetail> => {
 
   return customFetch<AttendanceSessionDetail>(getGetAttendanceSessionUrl(sessionId),
   {
@@ -942,14 +942,14 @@ export const getAttendanceSession = async (sessionId: number, options?: RequestI
 
 
 
-export const getGetAttendanceSessionQueryKey = (sessionId: number,) => {
+export const getGetAttendanceSessionQueryKey = (sessionId: string,) => {
     return [
     `/api/attendance/sessions/${sessionId}`
     ] as const;
     }
 
 
-export const getGetAttendanceSessionQueryOptions = <TData = Awaited<ReturnType<typeof getAttendanceSession>>, TError = ErrorType<unknown>>(sessionId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAttendanceSession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+export const getGetAttendanceSessionQueryOptions = <TData = Awaited<ReturnType<typeof getAttendanceSession>>, TError = ErrorType<unknown>>(sessionId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAttendanceSession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 ) => {
 
 const {query: queryOptions, request: requestOptions} = options ?? {};
@@ -976,7 +976,7 @@ export type GetAttendanceSessionQueryError = ErrorType<unknown>
  */
 
 export function useGetAttendanceSession<TData = Awaited<ReturnType<typeof getAttendanceSession>>, TError = ErrorType<unknown>>(
- sessionId: number, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAttendanceSession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+ sessionId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getAttendanceSession>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
 
  ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
 
@@ -993,7 +993,7 @@ export function useGetAttendanceSession<TData = Awaited<ReturnType<typeof getAtt
 
 
 
-export const getSubmitAttendanceRecordsUrl = (sessionId: number,) => {
+export const getSubmitAttendanceRecordsUrl = (sessionId: string,) => {
 
 
 
@@ -1004,7 +1004,7 @@ export const getSubmitAttendanceRecordsUrl = (sessionId: number,) => {
 /**
  * @summary Submit attendance records for a session (leader only)
  */
-export const submitAttendanceRecords = async (sessionId: number,
+export const submitAttendanceRecords = async (sessionId: string,
     attendanceRecordsBatch: AttendanceRecordsBatch, options?: RequestInit): Promise<AttendanceSessionDetail> => {
 
   return customFetch<AttendanceSessionDetail>(getSubmitAttendanceRecordsUrl(sessionId),
@@ -1020,8 +1020,8 @@ export const submitAttendanceRecords = async (sessionId: number,
 
 
 export const getSubmitAttendanceRecordsMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitAttendanceRecords>>, TError,{sessionId: number;data: BodyType<AttendanceRecordsBatch>}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof submitAttendanceRecords>>, TError,{sessionId: number;data: BodyType<AttendanceRecordsBatch>}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitAttendanceRecords>>, TError,{sessionId: string;data: BodyType<AttendanceRecordsBatch>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof submitAttendanceRecords>>, TError,{sessionId: string;data: BodyType<AttendanceRecordsBatch>}, TContext> => {
 
 const mutationKey = ['submitAttendanceRecords'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -1033,7 +1033,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitAttendanceRecords>>, {sessionId: number;data: BodyType<AttendanceRecordsBatch>}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof submitAttendanceRecords>>, {sessionId: string;data: BodyType<AttendanceRecordsBatch>}> = (props) => {
           const {sessionId,data} = props ?? {};
 
           return  submitAttendanceRecords(sessionId,data,requestOptions)
@@ -1054,11 +1054,11 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Submit attendance records for a session (leader only)
  */
 export const useSubmitAttendanceRecords = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitAttendanceRecords>>, TError,{sessionId: number;data: BodyType<AttendanceRecordsBatch>}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof submitAttendanceRecords>>, TError,{sessionId: string;data: BodyType<AttendanceRecordsBatch>}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof submitAttendanceRecords>>,
         TError,
-        {sessionId: number;data: BodyType<AttendanceRecordsBatch>},
+        {sessionId: string;data: BodyType<AttendanceRecordsBatch>},
         TContext
       > => {
       return useMutation(getSubmitAttendanceRecordsMutationOptions(options));

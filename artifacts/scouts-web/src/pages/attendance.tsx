@@ -22,7 +22,7 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { CalendarCheck, Plus, CheckCircle, XCircle, ChevronRight } from "lucide-react";
+import { CalendarCheck, Plus, CheckCircle, XCircle, ChevronRight, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 const sessionSchema = z.object({
@@ -144,8 +144,26 @@ function AttendanceSessionDetail({ sessionId, onClose }: { sessionId: string; on
   const { toast } = useToast();
   const { data: profile } = useGetMyProfile();
   const isLeader = profile?.role === "leader" || profile?.role === "developer";
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
   const [attendance, setAttendance] = useState<Record<string, "present" | "absent">>({});
+
+  const handleDeleteRecord = async (userId: string) => {
+    setDeletingUserId(userId);
+    try {
+      const res = await fetch(`/api/attendance/sessions/${sessionId}/records/${userId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete");
+      queryClient.invalidateQueries({ queryKey: getListAttendanceSessionsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetAttendanceSessionQueryKey(sessionId) });
+      toast({ title: "Attendance record removed" });
+    } catch {
+      toast({ title: "Failed to remove attendance record", variant: "destructive" });
+    } finally {
+      setDeletingUserId(null);
+    }
+  };
 
   const toggleStatus = (userId: string) => {
     setAttendance((prev) => ({
@@ -216,11 +234,24 @@ function AttendanceSessionDetail({ sessionId, onClose }: { sessionId: string; on
                 <span className="text-sm font-medium">
                   {scout.firstName} {scout.lastName}
                 </span>
-                {status === "present" ? (
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                ) : (
-                  <XCircle className="h-5 w-5 text-muted-foreground" />
-                )}
+                <div className="flex items-center gap-2">
+                  {isLeader && existingRecord && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); handleDeleteRecord(scout.replitId); }}
+                      disabled={deletingUserId === scout.replitId}
+                      className="p-1 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                      title="Remove attendance record"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
+                  {status === "present" ? (
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </div>
               </div>
             );
           })
@@ -364,7 +395,7 @@ export default function Attendance() {
               <span className="font-semibold text-primary">{mySummary.rate}%</span>
             </div>
             <Progress value={mySummary.rate} className="h-2" />
-            <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
               <div className="bg-muted/50 rounded-lg p-3">
                 <p className="text-xl font-bold">{mySummary.totalSessions}</p>
                 <p className="text-xs text-muted-foreground">Total / الكل</p>
@@ -382,52 +413,50 @@ export default function Attendance() {
         </Card>
       )}
 
-      {/* Sessions List for Scouts */}
-      {!isAdmin && (
-        <>
-          {isLoading ? (
-            <div className="space-y-3">
-              {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full" />)}
-            </div>
-          ) : sessions?.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center text-muted-foreground">
-                No sessions yet
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-3">
-              {sessions?.map((session) => (
-                <Card
-                  key={session.id}
-                  className="cursor-pointer hover:border-primary/50 transition-colors"
-                  onClick={() => setSelectedSessionId(session.id)}
-                  data-testid={`session-card-${session.id}`}
-                >
-                  <CardContent className="py-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-sm text-foreground">{session.title}</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {new Date(session.sessionDate).toLocaleDateString("ar-EG")}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="text-right">
-                          <Badge variant="outline" className="text-xs">
-                            {session.attendedCount}/{session.totalCount} حضروا
-                          </Badge>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      </div>
+      {/* Sessions List */}
+      <>
+        {isLoading ? (
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full" />)}
+          </div>
+        ) : sessions?.length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center text-muted-foreground">
+              No sessions yet
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {sessions?.map((session) => (
+              <Card
+                key={session.id}
+                className="cursor-pointer hover:border-primary/50 transition-colors"
+                onClick={() => setSelectedSessionId(session.id)}
+                data-testid={`session-card-${session.id}`}
+              >
+                <CardContent className="py-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-medium text-sm text-foreground">{session.title}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {new Date(session.sessionDate).toLocaleDateString("ar-EG")}
+                      </p>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
-        </>
-      )}
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <Badge variant="outline" className="text-xs">
+                          {session.attendedCount}/{session.totalCount} حضروا
+                        </Badge>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </>
 
       {/* Create Session Dialog */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>

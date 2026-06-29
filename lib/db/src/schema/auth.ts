@@ -21,6 +21,7 @@ const userSchema = new mongoose.Schema({
   section: { type: String, required: true, enum: ["سنافر", "اشبال", "زهرات", "كشافة", "مرشدات"] },
   team: { type: String, required: true, enum: ["A", "B"] },
   profileImageUrl: String,
+  nationalId: String,
   whatsappNumber: String,
   parentsWhatsappNumber: String,
   homeAddress: String,
@@ -45,6 +46,7 @@ export type User = {
   section?: string;
   team?: string;
   profileImageUrl?: string;
+  nationalId?: string;
   whatsappNumber?: string;
   parentsWhatsappNumber?: string;
   homeAddress?: string;

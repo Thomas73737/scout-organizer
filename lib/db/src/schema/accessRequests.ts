@@ -15,7 +15,9 @@ const accessRequestSchema = new mongoose.Schema({
   whatsappNumber: { type: String },
   parentsWhatsappNumber: { type: String },
   homeAddress: { type: String },
+  nationalId: { type: String },
   photoUrl: { type: String },
+  parentNationalIdPhotoUrl: { type: String },
   patrol: { type: String, enum: ["صقر", "فهد", "ثعلب", "ذئب", "نمر", "نسر", "أسد", "غراب", "بلبل", "ديك", "خفاش", "غزال"] },
   status: { type: String, default: "pending", enum: accessRequestStatus },
   createdAt: { type: Date, default: Date.now },
@@ -38,7 +40,9 @@ export type AccessRequest = {
   whatsappNumber?: string;
   parentsWhatsappNumber?: string;
   homeAddress?: string;
+  nationalId?: string;
   photoUrl?: string;
+  parentNationalIdPhotoUrl?: string;
   patrol?: string;
   status?: typeof accessRequestStatus[number];
   createdAt?: Date;

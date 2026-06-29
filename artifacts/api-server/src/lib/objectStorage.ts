@@ -11,6 +11,20 @@ import {
   setObjectAclPolicy,
 } from "./objectAcl";
 
+const MAGIC_BYTES_MAP: Array<{ bytes: number[]; offset: number; mime: string }> = [
+  { bytes: [0xFF, 0xD8, 0xFF], offset: 0, mime: "image/jpeg" },
+  { bytes: [0x89, 0x50, 0x4E, 0x47], offset: 0, mime: "image/png" },
+  { bytes: [0x47, 0x49, 0x46], offset: 0, mime: "image/gif" },
+  { bytes: [0x52, 0x49, 0x46, 0x46], offset: 0, mime: "image/webp" },
+  { bytes: [0x42, 0x4D], offset: 0, mime: "image/bmp" },
+  { bytes: [0x00, 0x00, 0x01, 0x00], offset: 0, mime: "image/x-icon" },
+  { bytes: [0x38, 0x42, 0x50, 0x53], offset: 0, mime: "image/vnd.adobe.photoshop" },
+  { bytes: [0x25, 0x50, 0x44, 0x46], offset: 0, mime: "application/pdf" },
+  { bytes: [0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70], offset: 4, mime: "image/heif" },
+  { bytes: [0x00, 0x00, 0x00, 0x1C, 0x66, 0x74, 0x79, 0x70], offset: 4, mime: "image/heif" },
+  { bytes: [0x00, 0x00, 0x00, 0x20, 0x66, 0x74, 0x79, 0x70], offset: 4, mime: "image/heic" },
+];
+
 const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
 const IS_LOCAL_DEV = !process.env.REPLIT_DEPLOYMENT;
 
@@ -129,12 +143,18 @@ export class ObjectStorageService {
       const fileStream = fs.createReadStream(filePath);
       const webStream = Readable.toWeb(fileStream) as ReadableStream;
       const stats = fs.statSync(filePath);
+      const originalName = (file as any).originalName as string | null;
+      const contentType = this.getMimeType(originalName, filePath);
 
       const headers: Record<string, string> = {
-        "Content-Type": "application/octet-stream",
+        "Content-Type": contentType,
         "Cache-Control": `public, max-age=${cacheTtlSec}`,
         "Content-Length": String(stats.size),
       };
+
+      if (originalName) {
+        headers["Content-Disposition"] = `inline; filename="${encodeURIComponent(originalName)}"`;
+      }
 
       return new Response(webStream, { headers });
     }
@@ -157,7 +177,7 @@ export class ObjectStorageService {
     return new Response(webStream, { headers });
   }
 
-  async getObjectEntityUploadURL(): Promise<string> {
+  async getObjectEntityUploadURL(metadata?: { name?: string }): Promise<string> {
     const privateObjectDir = this.getPrivateObjectDir();
     if (!privateObjectDir) {
       throw new Error(
@@ -170,8 +190,14 @@ export class ObjectStorageService {
     const fullPath = `${privateObjectDir}/uploads/${objectId}`;
 
     if (IS_LOCAL_DEV) {
-      // For local development, return a direct API endpoint for upload
-      return `http://localhost:5000/api/storage/local-upload/${objectId}`;
+      // For local development, return a relative API endpoint for upload.
+      // The frontend (Vite proxy) forwards /api/* to this server, so relative
+      // URLs work from any host (localhost, ngrok, etc.).
+      let url = `/api/storage/local-upload/${objectId}`;
+      if (metadata?.name) {
+        url += `?filename=${encodeURIComponent(metadata.name)}`;
+      }
+      return url;
     }
 
     const { bucketName, objectName } = parseObjectPath(fullPath);
@@ -221,10 +247,10 @@ export class ObjectStorageService {
   }
 
   normalizeObjectEntityPath(rawPath: string): string {
-    // Handle local development URLs
+    // Handle local development URLs (both relative and absolute)
     if (IS_LOCAL_DEV && rawPath.includes('local-upload')) {
-      const url = new URL(rawPath);
-      const objectId = url.pathname.split('/').pop();
+      const pathname = rawPath.startsWith('http') ? new URL(rawPath).pathname : rawPath.split('?')[0];
+      const objectId = pathname.split('/').pop();
       return `/objects/uploads/${objectId}`;
     }
 
@@ -262,6 +288,21 @@ export class ObjectStorageService {
     return normalizedPath;
   }
 
+  async deleteObject(file: File): Promise<void> {
+    if (IS_LOCAL_DEV && this.isMockFile(file)) {
+      const filePath = (file as any).localPath;
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+      const metaPath = filePath + '.meta';
+      if (fs.existsSync(metaPath)) {
+        fs.unlinkSync(metaPath);
+      }
+      return;
+    }
+    await file.delete();
+  }
+
   async canAccessObjectEntity({
     userId,
     objectFile,
@@ -282,15 +323,100 @@ export class ObjectStorageService {
     });
   }
 
+  private getOriginalName(filePath: string): string | null {
+    try {
+      const metaPath = filePath + '.meta';
+      if (fs.existsSync(metaPath)) {
+        const meta = JSON.parse(fs.readFileSync(metaPath, 'utf-8'));
+        return meta.originalName || null;
+      }
+    } catch {}
+    return null;
+  }
+
+  private getMimeType(originalName: string | null, filePath?: string): string {
+    const ext = originalName ? path.extname(originalName).toLowerCase() : '';
+    const mimeMap: Record<string, string> = {
+      '.pdf': 'application/pdf',
+      '.ppt': 'application/vnd.ms-powerpoint',
+      '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+      '.svg': 'image/svg+xml',
+      '.bmp': 'image/bmp',
+      '.doc': 'application/msword',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.xls': 'application/vnd.ms-excel',
+      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      '.txt': 'text/plain',
+      '.csv': 'text/csv',
+      '.zip': 'application/zip',
+      '.mp4': 'video/mp4',
+      '.mp3': 'audio/mpeg',
+      '.heic': 'image/heic',
+      '.heif': 'image/heif',
+      '.avif': 'image/avif',
+    };
+    if (ext && mimeMap[ext]) return mimeMap[ext];
+    if (filePath) {
+      const detected = this.detectMimeFromFile(filePath);
+      if (detected) return detected;
+    }
+    return "image/jpeg";
+  }
+
+  private detectMimeFromFile(filePath: string | null): string {
+    if (!filePath) return "image/jpeg";
+    try {
+      const fd = fs.openSync(filePath, 'r');
+      const buffer = Buffer.alloc(16);
+      fs.readSync(fd, buffer, 0, 16, 0);
+      fs.closeSync(fd);
+      const detected = this.detectMimeFromBuffer(buffer);
+      return detected || "image/jpeg";
+    } catch {
+      return "image/jpeg";
+    }
+  }
+
+  private detectMimeFromBuffer(buffer: Buffer): string | null {
+    for (const entry of MAGIC_BYTES_MAP) {
+      let match = true;
+      for (let i = 0; i < entry.bytes.length; i++) {
+        const byteIndex = entry.offset + i;
+        if (byteIndex >= buffer.length || buffer[byteIndex] !== entry.bytes[i]) {
+          match = false;
+          break;
+        }
+      }
+      if (match) {
+        if (entry.mime === "image/webp") {
+          if (buffer.length >= 12 && buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) {
+            return "image/webp";
+          }
+          continue;
+        }
+        return entry.mime;
+      }
+    }
+    return null;
+  }
+
   // Helper methods for local file system mock
   private createMockFile(filePath: string): File {
+    const originalName = this.getOriginalName(filePath);
+    const contentType = this.getMimeType(originalName, filePath);
     const mockFile = {
       localPath: filePath,
       isMock: true,
+      originalName,
       getMetadata: async () => {
         const stats = fs.statSync(filePath);
         return {
-          contentType: "application/octet-stream",
+          contentType,
           size: stats.size,
         };
       },

@@ -45,6 +45,8 @@ export interface ScoutUser {
   email: string | null;
   /** @nullable */
   profileImageUrl?: string | null;
+  /** @nullable */
+  patrol?: string | null;
   role: ScoutUserRole;
   createdAt: string;
 }
@@ -65,6 +67,7 @@ export interface UserRoleUpdate {
 export interface UserStats {
   totalScouts: number;
   totalLeaders: number;
+  totalDevelopers: number;
   totalMembers: number;
 }
 

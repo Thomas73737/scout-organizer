@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
-import { PostModel, ScoutProfileModel, UserModel } from "@workspace/db";
+import { PostModel, ScoutProfileModel, UserModel, NotificationModel } from "@workspace/db";
 import { CreatePostBody } from "@workspace/api-zod";
 
 const router = Router();
@@ -77,7 +77,28 @@ router.post("/posts", async (req, res) => {
   });
 
   const author = await UserModel.findOne({ id: req.user.id }).lean();
+  const authorName = author ? `${author.firstName ?? ""} ${author.lastName ?? ""}`.trim() : "Someone";
   const profile = await ScoutProfileModel.findOne({ userId: req.user.id }).lean();
+
+  // Create notifications for all users except the author
+  try {
+    const allUsers = await UserModel.find({ id: { $ne: req.user.id } }).lean();
+    const notifications = allUsers.map((user) => ({
+      id: randomUUID(),
+      userId: user.id,
+      type: "post" as const,
+      title: "New Community Post",
+      message: parsed.data.content.length > 100 ? parsed.data.content.slice(0, 100) + "..." : parsed.data.content,
+      relatedId: post.id,
+      authorName,
+      isRead: false,
+    }));
+    if (notifications.length > 0) {
+      await NotificationModel.insertMany(notifications);
+    }
+  } catch (err) {
+    console.error("Failed to create notifications:", err);
+  }
 
   res.status(201).json({
     ...post.toObject(),

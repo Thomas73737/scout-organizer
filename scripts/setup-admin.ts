@@ -1,8 +1,15 @@
 import mongoose from "mongoose";
-import { randomUUID } from "crypto";
+import crypto, { randomUUID } from "crypto";
 import { UserModel, ScoutProfileModel } from "../lib/db/src/schema";
 
 const DATABASE_URL = process.env.DATABASE_URL || "mongodb://localhost:27017/scout-organizer";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
+
+function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString("base64");
+  const hash = crypto.scryptSync(password, salt, 64).toString("base64");
+  return `$scrypt$${salt}$${hash}`;
+}
 
 async function setupAdmin() {
   try {
@@ -45,8 +52,11 @@ async function setupAdmin() {
         email: adminEmail,
         firstName: "Admin",
         lastName: "User",
+        password: hashPassword(ADMIN_PASSWORD),
         phone: "+1234567890",
-        team: "Leadership",
+        section: "كشافة",
+        team: "A",
+        status: "approved",
       });
 
       await ScoutProfileModel.create({
@@ -57,6 +67,7 @@ async function setupAdmin() {
 
       console.log("Created new admin user:");
       console.log("  Email:", adminEmail);
+      console.log("  Password:", ADMIN_PASSWORD);
       console.log("  User ID:", adminId);
       console.log("  Role: leader");
     }
