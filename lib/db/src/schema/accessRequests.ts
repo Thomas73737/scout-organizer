@@ -10,7 +10,7 @@ const accessRequestSchema = new mongoose.Schema({
   password: { type: String, required: true },
   phone: { type: String, required: true },
   section: { type: String, required: true, enum: ["سنافر", "اشبال", "زهرات", "كشافة", "مرشدات"] },
-  team: { type: String, required: true, enum: ["A", "B"] },
+  team: { type: String, enum: ["A", "B"] },
   isNewScout: { type: Boolean, required: true },
   whatsappNumber: { type: String },
   parentsWhatsappNumber: { type: String },

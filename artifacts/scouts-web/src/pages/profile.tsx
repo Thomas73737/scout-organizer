@@ -9,13 +9,17 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { UserCircle, Mail, CalendarCheck, Camera, Lock, X } from "lucide-react";
+import { useAuth } from "@workspace/replit-auth-web";
+import { usePushNotificationContext } from "@/hooks/PushNotificationContext";
+import { UserCircle, Mail, CalendarCheck, Camera, Lock, X, Bell, BellOff } from "lucide-react";
 
 export default function Profile() {
   const { data: profile, isLoading: profileLoading } = useGetMyProfile();
   const { data: summary, isLoading: summaryLoading } = useGetMyAttendanceSummary();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { isAuthenticated, user } = useAuth();
+  const { permission, isSubscribed, deviceCount, appStatus, subscribe, unsubscribe } = usePushNotificationContext();
 
   const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
   const [isSavingImage, setIsSavingImage] = useState(false);
@@ -272,6 +276,54 @@ export default function Profile() {
           >
             {isChangingPassword ? "Changing..." : "Change Password / تغيير كلمة المرور"}
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Push Notifications */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            {isSubscribed ? <Bell className="h-4 w-4 text-primary" /> : <BellOff className="h-4 w-4 text-muted-foreground" />}
+            Push Notifications / الإشعارات
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex-1">
+              <p className="text-sm font-medium">
+                {isSubscribed ? 'Notifications enabled' : 'Notifications disabled'}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Get notified when admins post announcements
+              </p>
+              {isSubscribed && deviceCount > 0 && (
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  {deviceCount} device{deviceCount !== 1 ? 's' : ''} registered
+                </p>
+              )}
+              {appStatus !== 'ready' && appStatus !== 'initializing' && appStatus !== 'registering_sw' && (
+                <p className="text-[10px] text-amber-600 mt-1">
+                  Status: {appStatus}
+                </p>
+              )}
+            </div>
+            {isSubscribed ? (
+              <Button size="sm" variant="outline" onClick={unsubscribe}>
+                Disable
+              </Button>
+            ) : (
+              <Button size="sm" onClick={async () => {
+                const subscribed = await subscribe();
+                if (subscribed) {
+                  toast({ title: "Notifications enabled successfully" });
+                } else {
+                  toast({ title: "Failed to enable notifications", variant: "destructive" });
+                }
+              }}>
+                Enable
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
 

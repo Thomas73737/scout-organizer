@@ -145,8 +145,16 @@ export default function Admin() {
 
   const fixImageUrl = (url: string | undefined) => {
     if (!url) return undefined;
-    if (url.startsWith("/objects/")) return `/api/storage${url}`;
-    return url;
+    let cleaned = url;
+    try {
+      if (cleaned.startsWith("http://") || cleaned.startsWith("https://")) {
+        const parsed = new URL(cleaned);
+        cleaned = parsed.pathname + parsed.search;
+      }
+    } catch {}
+    if (cleaned.startsWith("/objects/")) return `/api/storage${cleaned}`;
+    if (cleaned.startsWith("/api/storage/objects/")) return cleaned;
+    return cleaned;
   };
   const [requestsLoading, setRequestsLoading] = useState(true);
   const [requestActionPending, setRequestActionPending] = useState<string | null>(null);
@@ -352,6 +360,9 @@ export default function Admin() {
                           src={fixImageUrl(request.photoUrl)}
                           alt={request.name}
                           className="w-16 h-16 rounded-lg object-cover border border-border group-hover:ring-2 group-hover:ring-primary transition-all"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
                         />
                         <div className="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <Eye className="h-5 w-5 text-white" />
@@ -367,6 +378,9 @@ export default function Admin() {
                           src={fixImageUrl(request.parentNationalIdPhotoUrl)}
                           alt="Parent National ID"
                           className="w-16 h-16 rounded-lg object-cover border border-border group-hover:ring-2 group-hover:ring-primary transition-all"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
                         />
                         <div className="absolute inset-0 bg-black/40 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                           <Eye className="h-5 w-5 text-white" />
@@ -559,7 +573,20 @@ export default function Admin() {
           </DialogHeader>
           {previewImage && (
             <div className="flex items-center justify-center p-2">
-              <img src={previewImage} alt="Preview" className="max-h-[70vh] w-auto rounded-lg object-contain" />
+              <img
+                src={previewImage}
+                alt="Preview"
+                className="max-h-[70vh] w-auto rounded-lg object-contain"
+                onError={(e) => {
+                  const el = e.currentTarget;
+                  el.style.display = "none";
+                  const fallback = el.parentElement?.querySelector("[data-fallback]") as HTMLElement | null;
+                  if (fallback) fallback.style.display = "flex";
+                }}
+              />
+              <div data-fallback className="hidden items-center justify-center h-40 w-full text-muted-foreground text-sm">
+                Failed to load image
+              </div>
             </div>
           )}
         </DialogContent>

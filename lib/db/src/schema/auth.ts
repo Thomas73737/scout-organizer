@@ -19,7 +19,7 @@ const userSchema = new mongoose.Schema({
   lastName: String,
   phone: { type: String, required: true, unique: true },
   section: { type: String, required: true, enum: ["سنافر", "اشبال", "زهرات", "كشافة", "مرشدات"] },
-  team: { type: String, required: true, enum: ["A", "B"] },
+  team: { type: String, enum: ["A", "B"] },
   profileImageUrl: String,
   nationalId: String,
   whatsappNumber: String,

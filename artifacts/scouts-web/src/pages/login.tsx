@@ -111,7 +111,7 @@ export default function Login() {
         setError("Please fill in all fields.");
         return;
       }
-      if (!isNewScout && !team) {
+      if (isNewScout === false && !team) {
         setError("Please fill in all fields.");
         return;
       }
@@ -124,7 +124,7 @@ export default function Login() {
       }
       
       // Validate new scout fields
-      if (isNewScout) {
+      if (isNewScout === true) {
         if (!nationalId || !parentsWhatsappNumber || !homeAddress || !selectedPhoto || !parentNationalIdPhoto) {
           setError("Please fill in all new scout fields including photo.");
           return;
@@ -136,7 +136,7 @@ export default function Login() {
       }
       
       // Validate existing scout fields
-      if (!isNewScout && !patrol) {
+      if (isNewScout === false && !patrol) {
         setError("Please select your patrol.");
         return;
       }
@@ -188,7 +188,7 @@ export default function Login() {
         // Upload files first if it's a new scout
         let uploadedPhotoUrl: string | null = null;
         let uploadedParentNationalIdUrl: string | null = null;
-        if (isNewScout) {
+        if (isNewScout === true) {
           if (selectedPhoto) {
             uploadedPhotoUrl = await uploadFile(selectedPhoto);
             if (!uploadedPhotoUrl) {
@@ -217,14 +217,14 @@ export default function Login() {
             password, 
             phone, 
             section, 
-            team: isNewScout ? undefined : team, 
+            team: isNewScout === false ? team : undefined, 
             isNewScout,
-            nationalId: isNewScout ? nationalId : undefined,
-            parentsWhatsappNumber: isNewScout ? parentsWhatsappNumber : undefined,
-            homeAddress: isNewScout ? homeAddress : undefined,
-            photoUrl: isNewScout ? uploadedPhotoUrl : undefined,
-            parentNationalIdPhotoUrl: isNewScout ? uploadedParentNationalIdUrl : undefined,
-            patrol: patrol
+            nationalId: isNewScout === true ? nationalId : undefined,
+            parentsWhatsappNumber: isNewScout === true ? parentsWhatsappNumber : undefined,
+            homeAddress: isNewScout === true ? homeAddress : undefined,
+            photoUrl: isNewScout === true ? uploadedPhotoUrl : undefined,
+            parentNationalIdPhotoUrl: isNewScout === true ? uploadedParentNationalIdUrl : undefined,
+            patrol: isNewScout === false ? patrol : undefined
           }),
         });
 
@@ -416,7 +416,7 @@ export default function Login() {
                   </select>
                 </div>
 
-                {!isNewScout && (
+                {isNewScout === false && (
                   <div className="space-y-2 text-left">
                     <label className="block text-sm font-medium text-foreground">Team / الفريق</label>
                     <select
@@ -433,7 +433,7 @@ export default function Login() {
                   </div>
                 )}
 
-                {!isNewScout && (
+                {isNewScout === false && (
                   <div className="space-y-2 text-left">
                     <label className="block text-sm font-medium text-foreground">ممطليعة / Patrol</label>
                     <select

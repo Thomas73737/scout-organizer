@@ -7,6 +7,7 @@ import { useGetMyProfile } from "@workspace/api-client-react";
 import NotFound from "@/pages/not-found";
 import { Layout } from "@/components/layout";
 import { Loader2 } from "lucide-react";
+import { PushNotificationProvider } from "@/hooks/PushNotificationContext";
 
 import Home from "@/pages/home";
 import Announcements from "@/pages/announcements";
@@ -76,12 +77,21 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-          <Router />
-        </WouterRouter>
+        <AppContent />
         <Toaster />
       </TooltipProvider>
     </QueryClientProvider>
+  );
+}
+
+function AppContent() {
+  const { isAuthenticated, user } = useAuth();
+  return (
+    <PushNotificationProvider userId={isAuthenticated ? user?.id || null : null}>
+      <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
+        <Router />
+      </WouterRouter>
+    </PushNotificationProvider>
   );
 }
 

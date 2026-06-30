@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useGetMyProfile, useListUsers } from "@workspace/api-client-react";
@@ -57,7 +57,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [isRemovingImage, setIsRemovingImage] = React.useState(false);
   const [unreadCount, setUnreadCount] = React.useState(0);
   const [showUserMenu, setShowUserMenu] = React.useState(false);
-  const userMenuRef = React.useRef<HTMLDivElement>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   const isLeader = profile?.role === "leader" || profile?.role === "developer";
 
@@ -128,9 +128,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const currentTabLabel = pageTitles[location] ?? "";
 
   return (
-    <div className="flex min-h-[100dvh] w-full bg-background text-foreground flex-col md:h-screen md:flex-row md:overflow-hidden">
+    <div className="flex min-h-screen w-full bg-background text-foreground flex-col md:h-screen md:flex-row md:overflow-hidden">
       {/* ───── Mobile Header ───── */}
-      <div className="md:hidden flex items-center justify-between px-4 py-3 bg-primary text-primary-foreground shadow-md sticky top-0 z-50">
+      <div className="md:hidden flex items-center justify-between px-4 py-3 bg-primary text-primary-foreground shadow-md sticky top-0 z-50 flex-shrink-0">
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <Menu className="h-5 w-5 shrink-0 cursor-pointer opacity-80 hover:opacity-100 transition-opacity" onClick={toggleMobileMenu} />
           <h1 className="font-serif font-bold text-base truncate">{currentTabLabel || "San George Scouts"}</h1>
@@ -337,9 +337,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      {/* ───── Desktop Top Bar ───── */}
-      <div className="hidden md:flex flex-col flex-1 min-w-0">
-        <header className="sticky top-0 z-30 bg-background/80 backdrop-blur-md border-b border-border px-8 py-3 flex items-center justify-between">
+      {/* ───── Main Content Area ───── */}
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+        <header className="hidden md:flex sticky top-0 z-30 bg-background/80 backdrop-blur-md border-b border-border px-8 py-3 items-center justify-between">
           <div>
             <h2 className="text-lg font-serif font-bold text-foreground">{currentTabLabel || "San George Scouts"}</h2>
           </div>
@@ -417,8 +417,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Main Content */}
-        <div className="flex-1 flex min-w-0">
-          <main className="flex-1 p-6 lg:p-10 max-w-6xl mx-auto w-full overflow-y-auto">
+        <div className="flex-1 flex min-w-0 overflow-hidden">
+          <main className="flex-1 p-4 md:p-6 lg:p-10 max-w-6xl mx-auto w-full overflow-y-auto pb-20 md:pb-10">
             {children}
           </main>
 

@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
-import { AnnouncementModel, ScoutProfileModel, UserModel, NotificationModel } from "@workspace/db";
+import { AnnouncementModel, ScoutProfileModel, UserModel, NotificationModel, PushSubscriptionModel } from "@workspace/db";
 import { CreateAnnouncementBody } from "@workspace/api-zod";
+import { sendPushNotificationToMany } from "../lib/pushNotification";
 
 const router = Router();
 
@@ -94,6 +95,44 @@ router.post("/announcements", async (req, res) => {
     }));
     if (notifications.length > 0) {
       await NotificationModel.insertMany(notifications);
+    }
+
+    // Send push notifications to users with registered push subscriptions
+    try {
+      const subscriptions = await PushSubscriptionModel.find({
+        userId: { $in: allUsers.map((u) => u.id) },
+      }).lean();
+
+      if (subscriptions.length > 0) {
+        const pushData = subscriptions.map((sub) => ({
+          endpoint: sub.endpoint,
+          keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth },
+        }));
+
+        const result = await sendPushNotificationToMany(
+          pushData,
+          "New Announcement",
+          `${authorName} posted: ${parsed.data.title}`,
+          {
+            type: "announcement",
+            announcementId: announcement.id,
+            url: "/announcements",
+          },
+        );
+
+        console.log(`Push notifications sent: ${result.successful} successful, ${result.failed.length} failed`);
+
+        // Remove expired subscriptions
+        if (result.failed.length > 0) {
+          const expiredEndpoints = result.failed.map((f) => f.subscription.endpoint);
+          await PushSubscriptionModel.deleteMany({ endpoint: { $in: expiredEndpoints } });
+          console.log(`Removed ${result.failed.length} expired subscriptions`);
+        }
+      } else {
+        console.log("No push subscriptions found");
+      }
+    } catch (pushError) {
+      console.error("Failed to send push notifications:", pushError);
     }
   } catch (err) {
     console.error("Failed to create notifications:", err);

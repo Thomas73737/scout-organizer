@@ -8,6 +8,7 @@ import attendanceRouter from "./attendance";
 import announcementsRouter from "./announcements";
 import postsRouter from "./posts";
 import notificationsRouter from "./notifications";
+import pushNotificationsRouter from "./pushNotifications";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(attendanceRouter);
 router.use(announcementsRouter);
 router.use(postsRouter);
 router.use(notificationsRouter);
+router.use(pushNotificationsRouter);
 
 export default router;
