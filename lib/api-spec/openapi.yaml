@@ -510,6 +510,10 @@ components:
           type: integer
         totalCount:
           type: integer
+        excusedCount:
+          type: integer
+        withGearCount:
+          type: integer
 
     AttendanceSessionInput:
       type: object
@@ -537,6 +541,10 @@ components:
         status:
           type: string
           enum: [present, absent]
+        excuse:
+          type: boolean
+        hasGear:
+          type: boolean
 
     AttendanceSessionDetail:
       type: object
@@ -568,6 +576,10 @@ components:
         status:
           type: string
           enum: [present, absent]
+        excuse:
+          type: boolean
+        hasGear:
+          type: boolean
 
     AttendanceRecordsBatch:
       type: object
@@ -587,6 +599,12 @@ components:
         attended:
           type: integer
         absent:
+          type: integer
+        absentExcused:
+          type: integer
+        absentUnexcused:
+          type: integer
+        withoutGear:
           type: integer
         rate:
           type: number

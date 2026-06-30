@@ -15,4 +15,6 @@ export interface AttendanceSession {
   createdAt: Date;
   attendedCount: number;
   totalCount: number;
+  excusedCount?: number;
+  withGearCount?: number;
 }

@@ -3,7 +3,7 @@ import { useGetMyProfile } from "@workspace/api-client-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Bell, MessageSquare, CalendarCheck } from "lucide-react";
+import { Users, Bell, MessageSquare, CalendarCheck, Send, CalendarDays, Trophy } from "lucide-react";
 import { Link } from "wouter";
 
 export default function Home() {
@@ -109,6 +109,34 @@ export default function Home() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Quick Links */}
+      <div className="grid grid-cols-3 gap-4">
+        <Link href="/chat">
+          <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
+            <CardContent className="pt-6 flex flex-col items-center text-center">
+              <Send className="h-6 w-6 text-primary mb-2" />
+              <p className="text-sm font-medium">Chat / الدردشة</p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/calendar">
+          <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
+            <CardContent className="pt-6 flex flex-col items-center text-center">
+              <CalendarDays className="h-6 w-6 text-primary mb-2" />
+              <p className="text-sm font-medium">Calendar / التقويم</p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link href="/leaderboard">
+          <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
+            <CardContent className="pt-6 flex flex-col items-center text-center">
+              <Trophy className="h-6 w-6 text-yellow-500 mb-2" />
+              <p className="text-sm font-medium">Leaderboard / المتصدرين</p>
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* Latest Announcements */}

@@ -14,4 +14,6 @@ export interface AttendanceRecord {
   /** @nullable */
   profileImageUrl?: string | null;
   status: AttendanceRecordStatus;
+  excuse?: boolean;
+  hasGear?: boolean;
 }

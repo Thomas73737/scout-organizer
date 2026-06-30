@@ -9,6 +9,9 @@ import announcementsRouter from "./announcements";
 import postsRouter from "./posts";
 import notificationsRouter from "./notifications";
 import pushNotificationsRouter from "./pushNotifications";
+import chatRouter from "./chat";
+import pointsRouter from "./points";
+import calendarRouter from "./calendar";
 
 const router: IRouter = Router();
 
@@ -22,5 +25,8 @@ router.use(announcementsRouter);
 router.use(postsRouter);
 router.use(notificationsRouter);
 router.use(pushNotificationsRouter);
+router.use(chatRouter);
+router.use(pointsRouter);
+router.use(calendarRouter);
 
 export default router;

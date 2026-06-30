@@ -348,7 +348,7 @@ export default function Profile() {
                 <span className="font-semibold text-primary" data-testid="text-attendance-rate">{summary?.rate ?? 0}%</span>
               </div>
               <Progress value={summary?.rate ?? 0} className="h-2" />
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center pt-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-center pt-2">
                 <div className="bg-muted/50 rounded-lg p-3" data-testid="stat-total-sessions">
                   <p className="text-2xl font-bold">{summary?.totalSessions ?? 0}</p>
                   <p className="text-xs text-muted-foreground mt-1">Total / الكل</p>
@@ -360,6 +360,18 @@ export default function Profile() {
                 <div className="bg-red-50 dark:bg-red-900/20 rounded-lg p-3" data-testid="stat-absent">
                   <p className="text-2xl font-bold text-red-500">{summary?.absent ?? 0}</p>
                   <p className="text-xs text-muted-foreground mt-1">Absent / غياب</p>
+                </div>
+                <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3">
+                  <p className="text-2xl font-bold text-amber-600">{summary?.absentExcused ?? 0}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Excused / معذور</p>
+                </div>
+                <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-3">
+                  <p className="text-2xl font-bold text-orange-600">{summary?.absentUnexcused ?? 0}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Unexcused / غير معذور</p>
+                </div>
+                <div className="bg-sky-50 dark:bg-sky-900/20 rounded-lg p-3">
+                  <p className="text-2xl font-bold text-sky-600">{summary?.withoutGear ?? 0}</p>
+                  <p className="text-xs text-muted-foreground mt-1">No Gear / من غير العدة</p>
                 </div>
               </div>
             </>

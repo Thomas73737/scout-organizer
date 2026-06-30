@@ -10,5 +10,8 @@ export interface AttendanceSummary {
   totalSessions: number;
   attended: number;
   absent: number;
+  absentExcused: number;
+  absentUnexcused: number;
+  withoutGear: number;
   rate: number;
 }

@@ -7,7 +7,9 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Shield, Users, Trash2, Download, Eye } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Shield, Users, Trash2, Download, Eye, Award, Plus, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -142,6 +144,10 @@ export default function Admin() {
     patrol?: string;
   }>>([]);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
+  const [selectedScoutForPoints, setSelectedScoutForPoints] = useState("");
+  const [pointsAmount, setPointsAmount] = useState("");
+  const [pointsReason, setPointsReason] = useState("");
+  const [awardingPoints, setAwardingPoints] = useState(false);
 
   const fixImageUrl = (url: string | undefined) => {
     if (!url) return undefined;
@@ -227,6 +233,34 @@ export default function Admin() {
     if (userToDelete) {
       deleteUserMutation.mutate(userToDelete);
     }
+  };
+
+  const handleAwardPoints = async () => {
+    if (!selectedScoutForPoints || !pointsAmount || !pointsReason) return;
+    setAwardingPoints(true);
+    try {
+      const res = await fetch("/api/points/award", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          userId: selectedScoutForPoints,
+          points: parseInt(pointsAmount),
+          reason: pointsReason,
+        }),
+      });
+      if (res.ok) {
+        toast({ title: `Awarded ${pointsAmount} points to scout` });
+        setSelectedScoutForPoints("");
+        setPointsAmount("");
+        setPointsReason("");
+      } else {
+        toast({ title: "Failed to award points", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Failed to award points", variant: "destructive" });
+    }
+    setAwardingPoints(false);
   };
 
   const getInitials = (first: string | null, last: string | null) => {
@@ -463,6 +497,64 @@ export default function Admin() {
               ))}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Award className="h-4 w-4 text-yellow-500" />
+            Award Points / منح النقاط
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Select Scout / اختر الكشاف</label>
+              <Select
+                value={selectedScoutForPoints}
+                onValueChange={setSelectedScoutForPoints}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Choose a scout..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {scouts.map((s) => (
+                    <SelectItem key={s.replitId} value={s.replitId}>
+                      {s.firstName} {s.lastName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-4">
+              <div className="flex-1">
+                <label className="text-sm font-medium">Points / النقاط</label>
+                <Input
+                  type="number"
+                  value={pointsAmount}
+                  onChange={(e) => setPointsAmount(e.target.value)}
+                  placeholder="e.g. 10"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-sm font-medium">Reason / السبب</label>
+                <Input
+                  value={pointsReason}
+                  onChange={(e) => setPointsReason(e.target.value)}
+                  placeholder="e.g. Attendance"
+                />
+              </div>
+            </div>
+            <Button
+              onClick={handleAwardPoints}
+              disabled={!selectedScoutForPoints || !pointsAmount || !pointsReason || awardingPoints}
+              className="w-full"
+            >
+              {awardingPoints ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+              Award Points / منح النقاط
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

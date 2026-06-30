@@ -26,6 +26,8 @@ const attendanceRecordSchema = new mongoose.Schema({
   sessionId: { type: String, required: true },
   userId: { type: String, required: true },
   status: { type: String, required: true, enum: attendanceStatusEnum },
+  excuse: { type: Boolean, default: false },
+  hasGear: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
 });
 
@@ -83,6 +85,8 @@ export type AttendanceRecord = {
   sessionId: string;
   userId: string;
   status: typeof attendanceStatusEnum[number];
+  excuse?: boolean;
+  hasGear?: boolean;
   createdAt?: Date;
 };
 

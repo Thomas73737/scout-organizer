@@ -80,6 +80,8 @@ export interface AttendanceSession {
   createdAt: string;
   attendedCount: number;
   totalCount: number;
+  excusedCount?: number;
+  withGearCount?: number;
 }
 
 export interface AttendanceSessionInput {
@@ -104,6 +106,8 @@ export interface AttendanceRecord {
   /** @nullable */
   profileImageUrl?: string | null;
   status: AttendanceRecordStatus;
+  excuse?: boolean;
+  hasGear?: boolean;
 }
 
 export interface AttendanceSessionDetail {
@@ -127,6 +131,8 @@ export const AttendanceRecordItemStatus = {
 export interface AttendanceRecordItem {
   userId: string;
   status: AttendanceRecordItemStatus;
+  excuse?: boolean;
+  hasGear?: boolean;
 }
 
 export interface AttendanceRecordsBatch {
@@ -137,6 +143,9 @@ export interface AttendanceSummary {
   totalSessions: number;
   attended: number;
   absent: number;
+  absentExcused: number;
+  absentUnexcused: number;
+  withoutGear: number;
   rate: number;
 }
 

@@ -10,4 +10,6 @@ import type { AttendanceRecordItemStatus } from './attendanceRecordItemStatus';
 export interface AttendanceRecordItem {
   userId: string;
   status: AttendanceRecordItemStatus;
+  excuse?: boolean;
+  hasGear?: boolean;
 }

@@ -17,6 +17,9 @@ import Profile from "@/pages/profile";
 import Admin from "@/pages/admin";
 import Login from "@/pages/login";
 import Waiting from "@/pages/waiting";
+import Chat from "@/pages/chat";
+import CalendarPage from "@/pages/calendar-scout";
+import Leaderboard from "@/pages/leaderboard";
 
 const queryClient = new QueryClient();
 
@@ -67,6 +70,15 @@ function Router() {
       </Route>
       <Route path="/admin">
         <ProtectedRoute component={Admin} adminOnly={true} />
+      </Route>
+      <Route path="/chat">
+        <ProtectedRoute component={Chat} />
+      </Route>
+      <Route path="/calendar">
+        <ProtectedRoute component={CalendarPage} />
+      </Route>
+      <Route path="/leaderboard">
+        <ProtectedRoute component={Leaderboard} />
       </Route>
       <Route component={NotFound} />
     </Switch>

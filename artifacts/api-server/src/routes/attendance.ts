@@ -42,11 +42,15 @@ router.get("/attendance/sessions", async (req, res) => {
       const records = await AttendanceRecordModel.find({ sessionId: session.id });
       const attendedCount = records.filter(r => r.status === "present").length;
       const totalCount = records.length;
+      const excusedCount = records.filter(r => r.status === "absent" && r.excuse === true).length;
+      const withGearCount = records.filter(r => r.hasGear === true).length;
       
       return {
         ...session,
         attendedCount,
         totalCount,
+        excusedCount,
+        withGearCount,
       };
     })
   );
@@ -113,6 +117,8 @@ router.get("/attendance/sessions/:sessionId", async (req, res) => {
         scoutName: user ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() : null,
         profileImageUrl: user?.profileImageUrl ?? null,
         status: record.status,
+        excuse: record.excuse ?? false,
+        hasGear: record.hasGear ?? false,
       };
     })
   );
@@ -166,6 +172,8 @@ router.post("/attendance/sessions/:sessionId/records", async (req, res) => {
         sessionId,
         userId: scout ? scout.userId : r.userId,
         status: r.status as "present" | "absent",
+        excuse: r.excuse ?? false,
+        hasGear: r.hasGear ?? false,
       };
     });
     await AttendanceRecordModel.insertMany(recordsToInsert);
@@ -185,6 +193,8 @@ router.post("/attendance/sessions/:sessionId/records", async (req, res) => {
         scoutName: user ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() : null,
         profileImageUrl: user?.profileImageUrl ?? null,
         status: record.status,
+        excuse: record.excuse ?? false,
+        hasGear: record.hasGear ?? false,
       };
     })
   );
@@ -233,12 +243,18 @@ router.get("/attendance/my-summary", async (req, res) => {
 
   const attended = myRecords.filter((r) => r.status === "present").length;
   const absent = myRecords.filter((r) => r.status === "absent").length;
+  const absentExcused = myRecords.filter((r) => r.status === "absent" && r.excuse === true).length;
+  const absentUnexcused = myRecords.filter((r) => r.status === "absent" && (!r.excuse || r.excuse === false)).length;
+  const withoutGear = myRecords.filter((r) => r.hasGear === false).length;
   const total = totalSessions;
 
   res.json({
     totalSessions: total,
     attended,
     absent,
+    absentExcused,
+    absentUnexcused,
+    withoutGear,
     rate: total > 0 ? Math.round((attended / total) * 100) : 0,
   });
 });

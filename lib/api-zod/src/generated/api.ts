@@ -140,7 +140,9 @@ export const ListAttendanceSessionsResponseItem = zod.object({
   "notes": zod.string().nullish(),
   "createdAt": zod.coerce.date(),
   "attendedCount": zod.number(),
-  "totalCount": zod.number()
+  "totalCount": zod.number(),
+  "excusedCount": zod.number(),
+  "withGearCount": zod.number()
 })
 export const ListAttendanceSessionsResponse = zod.array(ListAttendanceSessionsResponseItem)
 
@@ -164,7 +166,9 @@ export const CreateAttendanceSessionResponse = zod.object({
   "notes": zod.string().nullish(),
   "createdAt": zod.coerce.date(),
   "attendedCount": zod.number(),
-  "totalCount": zod.number()
+  "totalCount": zod.number(),
+  "excusedCount": zod.number(),
+  "withGearCount": zod.number()
 })
 
 
@@ -185,7 +189,9 @@ export const GetAttendanceSessionResponse = zod.object({
   "userId": zod.string(),
   "scoutName": zod.string().nullable(),
   "profileImageUrl": zod.string().nullish(),
-  "status": zod.enum(['present', 'absent'])
+  "status": zod.enum(['present', 'absent']),
+  "excuse": zod.boolean().optional(),
+  "hasGear": zod.boolean().optional()
 }))
 })
 
@@ -200,7 +206,9 @@ export const SubmitAttendanceRecordsParams = zod.object({
 export const SubmitAttendanceRecordsBody = zod.object({
   "records": zod.array(zod.object({
   "userId": zod.string(),
-  "status": zod.enum(['present', 'absent'])
+  "status": zod.enum(['present', 'absent']),
+  "excuse": zod.boolean().optional(),
+  "hasGear": zod.boolean().optional()
 }))
 })
 
@@ -214,7 +222,9 @@ export const SubmitAttendanceRecordsResponse = zod.object({
   "userId": zod.string(),
   "scoutName": zod.string().nullable(),
   "profileImageUrl": zod.string().nullish(),
-  "status": zod.enum(['present', 'absent'])
+  "status": zod.enum(['present', 'absent']),
+  "excuse": zod.boolean().optional(),
+  "hasGear": zod.boolean().optional()
 }))
 })
 
@@ -226,6 +236,9 @@ export const GetMyAttendanceSummaryResponse = zod.object({
   "totalSessions": zod.number(),
   "attended": zod.number(),
   "absent": zod.number(),
+  "absentExcused": zod.number(),
+  "absentUnexcused": zod.number(),
+  "withoutGear": zod.number(),
   "rate": zod.number()
 })
 

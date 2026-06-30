@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useGetMyProfile, useListUsers } from "@workspace/api-client-react";
 import type { ScoutUser } from "@workspace/api-client-react";
-import { Home, CalendarCheck, MessageSquare, UserCircle, Shield, LogOut, Menu, X, Users, Trash2, Megaphone, Bell, BellRing, ChevronDown } from "lucide-react";
+import { Home, CalendarCheck, MessageSquare, UserCircle, Shield, LogOut, Menu, X, Users, Trash2, Megaphone, Bell, BellRing, ChevronDown, Send, CalendarDays, Trophy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 const getInitials = (first: string | null, last: string | null) => {
   return `${first?.[0] ?? ""}${last?.[0] ?? ""}`.toUpperCase() || "?";
@@ -34,6 +35,9 @@ const pageTitles: Record<string, string> = {
   "/posts": "Community / المجتمع",
   "/profile": "Profile / الملف الشخصي",
   "/admin": "Admin / الإدارة",
+  "/chat": "Chat / الدردشة",
+  "/calendar": "Calendar / التقويم",
+  "/leaderboard": "Leaderboard / المتصدرين",
 };
 
 const tabItems = [
@@ -45,7 +49,7 @@ const tabItems = [
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const { logout } = useAuth();
   const { data: profile } = useGetMyProfile();
   const { data: allUsers } = useListUsers();
@@ -110,6 +114,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
     { label: "Announcements / إعلانات", href: "/announcements", icon: Megaphone },
     { label: "Attendance / الحضور", href: "/attendance", icon: CalendarCheck },
     { label: "Community / المجتمع", href: "/posts", icon: MessageSquare },
+    { label: "Chat / الدردشة", href: "/chat", icon: Send },
+    { label: "Calendar / التقويم", href: "/calendar", icon: CalendarDays },
+    { label: "Leaderboard / المتصدرين", href: "/leaderboard", icon: Trophy },
     { label: "Profile / الملف الشخصي", href: "/profile", icon: UserCircle },
   ];
 
@@ -437,26 +444,41 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </div>
               <div className="flex-1 overflow-y-auto py-2">
                 {sortedUsers.map((user) => (
-                  <button
+                  <div
                     key={user.id}
-                    onClick={() => setSelectedUser(user)}
-                    className="w-full flex items-center gap-3 px-4 py-2 hover:bg-muted/50 transition-colors text-left"
+                    className="flex items-center gap-1 px-2 py-1 hover:bg-muted/50 transition-colors group"
                   >
-                    <Avatar className="h-8 w-8 shrink-0">
-                      {user.profileImageUrl && (
-                        <AvatarImage src={user.profileImageUrl} alt={user.firstName ?? ""} />
-                      )}
-                      <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                        {getInitials(user.firstName, user.lastName)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-foreground truncate leading-tight">
-                        {user.firstName} {user.lastName}
-                      </p>
-                    </div>
-                    {roleBadge(user.role)}
-                  </button>
+                    <button
+                      onClick={() => setSelectedUser(user)}
+                      className="flex items-center gap-3 flex-1 min-w-0 py-1 text-left"
+                    >
+                      <Avatar className="h-8 w-8 shrink-0">
+                        {user.profileImageUrl && (
+                          <AvatarImage src={user.profileImageUrl} alt={user.firstName ?? ""} />
+                        )}
+                        <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                          {getInitials(user.firstName, user.lastName)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-foreground truncate leading-tight">
+                          {user.firstName} {user.lastName}
+                        </p>
+                      </div>
+                      {roleBadge(user.role)}
+                    </button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => navigate(`/chat?user=${user.replitId}`)}
+                          className="h-7 w-7 shrink-0 flex items-center justify-center rounded-md text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-primary/10 hover:text-primary transition-all"
+                        >
+                          <Send className="h-3.5 w-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="left">Chat / دردشة</TooltipContent>
+                    </Tooltip>
+                  </div>
                 ))}
               </div>
             </aside>
@@ -515,26 +537,33 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </SheetHeader>
           <div className="overflow-y-auto py-2 h-full">
             {sortedUsers.map((user) => (
-              <button
-                key={user.id}
-                onClick={() => { setSelectedUser(user); }}
-                className="w-full flex items-center gap-3 px-4 py-2 hover:bg-muted/50 transition-colors text-left"
-              >
-                <Avatar className="h-8 w-8 shrink-0">
-                  {user.profileImageUrl && (
-                    <AvatarImage src={user.profileImageUrl} alt={user.firstName ?? ""} />
-                  )}
-                  <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                    {getInitials(user.firstName, user.lastName)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-foreground truncate leading-tight">
-                    {user.firstName} {user.lastName}
-                  </p>
-                </div>
-                {roleBadge(user.role)}
-              </button>
+              <div key={user.id} className="flex items-center gap-1 px-2 py-1 group">
+                <button
+                  onClick={() => { setSelectedUser(user); }}
+                  className="flex items-center gap-3 flex-1 min-w-0 py-1 text-left"
+                >
+                  <Avatar className="h-8 w-8 shrink-0">
+                    {user.profileImageUrl && (
+                      <AvatarImage src={user.profileImageUrl} alt={user.firstName ?? ""} />
+                    )}
+                    <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                      {getInitials(user.firstName, user.lastName)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium text-foreground truncate leading-tight">
+                      {user.firstName} {user.lastName}
+                    </p>
+                  </div>
+                  {roleBadge(user.role)}
+                </button>
+                <button
+                  onClick={() => navigate(`/chat?user=${user.replitId}`)}
+                  className="h-8 w-8 shrink-0 flex items-center justify-center rounded-md text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-primary/10 hover:text-primary transition-all"
+                >
+                  <Send className="h-4 w-4" />
+                </button>
+              </div>
             ))}
           </div>
         </SheetContent>
@@ -565,6 +594,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <p className="text-sm text-muted-foreground mt-2">{selectedUser.email}</p>
                 )}
               </div>
+              <Button
+                className="w-full gap-2"
+                onClick={() => {
+                  navigate(`/chat?user=${selectedUser.replitId}`);
+                }}
+              >
+                <Send className="h-4 w-4" />
+                Chat / دردشة
+              </Button>
             </div>
           )}
         </DialogContent>
