@@ -2,6 +2,7 @@ import { Clock, UserCheck, CheckCircle, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
 import { useEffect, useState } from "react";
+import logoImg from "@/assets/scoutPic/avatars-logo.jpg";
 
 export default function Waiting() {
   const [, setLocation] = useLocation();
@@ -56,6 +57,13 @@ export default function Waiting() {
     return (
       <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background p-4">
         <div className="text-center">
+          <div className="w-20 h-20 rounded-full overflow-hidden ring-2 ring-primary/20 mx-auto mb-4">
+            <img
+              src={logoImg}
+              alt="Saint George Scouts"
+              className="w-full h-full object-cover"
+            />
+          </div>
           <Clock className="w-12 h-12 animate-spin mx-auto mb-4 text-primary" />
           <p className="text-muted-foreground">Checking your request status...</p>
         </div>
@@ -72,8 +80,12 @@ export default function Waiting() {
         </div>
 
         <div className="w-full max-w-md bg-card border border-border shadow-xl rounded-xl p-8 flex flex-col items-center text-center">
-          <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-6">
-            <CheckCircle className="w-10 h-10" />
+          <div className="w-20 h-20 rounded-full overflow-hidden ring-2 ring-green-500/20 mb-6">
+            <img
+              src={logoImg}
+              alt="Saint George Scouts"
+              className="w-full h-full object-cover"
+            />
           </div>
 
           <h1 className="font-serif text-2xl font-bold text-foreground mb-2">Request Accepted!</h1>
@@ -109,8 +121,12 @@ export default function Waiting() {
         </div>
 
         <div className="w-full max-w-md bg-card border border-border shadow-xl rounded-xl p-8 flex flex-col items-center text-center">
-          <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-6">
-            <AlertCircle className="w-10 h-10" />
+          <div className="w-20 h-20 rounded-full overflow-hidden ring-2 ring-red-500/20 mb-6">
+            <img
+              src={logoImg}
+              alt="Saint George Scouts"
+              className="w-full h-full object-cover"
+            />
           </div>
 
           <h1 className="font-serif text-2xl font-bold text-foreground mb-2">Request Denied</h1>
@@ -126,11 +142,11 @@ export default function Waiting() {
           </div>
 
           <Button
-            onClick={() => setLocation("/")}
+            onClick={() => setLocation("/login")}
             variant="outline"
             className="w-full"
           >
-            Back to Home / العودة إلى الرئيسية
+            Back to Login / العودة إلى تسجيل الدخول
           </Button>
         </div>
       </div>
@@ -145,8 +161,12 @@ export default function Waiting() {
       </div>
 
       <div className="w-full max-w-md bg-card border border-border shadow-xl rounded-xl p-8 flex flex-col items-center text-center">
-        <div className="w-20 h-20 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center mb-6">
-          <Clock className="w-10 h-10" />
+        <div className="w-20 h-20 rounded-full overflow-hidden ring-2 ring-primary/20 mb-6">
+          <img
+            src={logoImg}
+            alt="Saint George Scouts"
+            className="w-full h-full object-cover"
+          />
         </div>
 
         <h1 className="font-serif text-2xl font-bold text-foreground mb-2">Account Pending Approval</h1>
@@ -194,11 +214,11 @@ export default function Waiting() {
           </Button>
           
           <Button
-            onClick={() => setLocation("/")}
+            onClick={() => setLocation("/login")}
             variant="ghost"
             className="w-full"
           >
-            Back to Home / العودة إلى الرئيسية
+            Back to Login / العودة إلى تسجيل الدخول
           </Button>
         </div>
       </div>

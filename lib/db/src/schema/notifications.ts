@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const notificationSchema = new mongoose.Schema({
   id: { type: String, unique: true, sparse: true },
   userId: { type: String, required: true, index: true },
-  type: { type: String, required: true, enum: ["announcement", "post"] },
+  type: { type: String, required: true, enum: ["announcement", "post", "message"] },
   title: { type: String, required: true },
   message: { type: String, required: true },
   relatedId: { type: String, required: true },
@@ -18,7 +18,7 @@ export type Notification = {
   _id?: mongoose.Types.ObjectId;
   id?: string;
   userId: string;
-  type: "announcement" | "post";
+  type: "announcement" | "post" | "message";
   title: string;
   message: string;
   relatedId: string;

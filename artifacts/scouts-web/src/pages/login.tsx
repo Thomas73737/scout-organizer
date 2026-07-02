@@ -1,12 +1,15 @@
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tent, Upload, X } from "lucide-react";
+import { Upload, X, Sun, Moon } from "lucide-react";
 import { useLocation } from "wouter";
+import { useTheme } from "next-themes";
 import { useRequestUploadUrl } from "@workspace/api-client-react";
+import logoImg from "@/assets/scoutPic/avatars-logo.jpg";
 
 export default function Login() {
   const [, setLocation] = useLocation();
+  const { theme, setTheme } = useTheme();
   const [mode, setMode] = useState<"request" | "login">("request");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -166,7 +169,7 @@ export default function Login() {
             if (loginResult.isAdmin) {
               window.location.href = "/admin";
             } else {
-              window.location.href = "/";
+              window.location.href = "/dashboard";
             }
           }, 1000);
           return;
@@ -269,14 +272,26 @@ export default function Login() {
 
   return (
     <div className="min-h-[100dvh] flex flex-col items-center justify-center bg-background p-4 relative overflow-hidden">
+      {/* Theme toggle */}
+      <button
+        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+        className="absolute top-4 right-4 z-10 p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+      >
+        <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+        <Moon className="h-5 w-5 absolute rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+      </button>
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none -z-10 opacity-20">
         <div className="absolute top-[-10%] right-[-5%] w-[40%] h-[40%] rounded-full bg-primary blur-[100px]"></div>
         <div className="absolute bottom-[-10%] left-[-5%] w-[40%] h-[40%] rounded-full bg-secondary blur-[100px]"></div>
       </div>
 
       <div className="w-full max-w-md bg-card border border-border shadow-xl rounded-xl p-6 sm:p-8 flex flex-col items-center text-center">
-        <div className="w-20 h-20 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-6">
-          <Tent className="w-10 h-10" />
+        <div className="w-20 h-20 rounded-full overflow-hidden ring-2 ring-primary/20 mb-6">
+          <img
+            src={logoImg}
+            alt="Saint George Scouts"
+            className="w-full h-full object-cover"
+          />
         </div>
 
         <h1 className="font-serif text-3xl font-bold text-foreground mb-2">San George Scouts</h1>
@@ -608,7 +623,7 @@ export default function Login() {
             )}
 
             {error && <p className="text-sm text-destructive">{error}</p>}
-            {status && <p className="text-sm text-green-600">{status}</p>}
+            {status && <p className="text-sm text-green-600 dark:text-green-400">{status}</p>}
 
             <Button
               type="submit"

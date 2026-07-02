@@ -10,6 +10,16 @@ const sessionSchema = new mongoose.Schema({
   expire: { type: Date, required: true },
 });
 
+// Badge enums
+export const mainBadgeEnum = ["First Class Scout", "Second Class Scout"] as const;
+export const proficiencyBadgeEnum = [
+  "First Aid", "Cook", "Astronomer", "Marksman", "Camper",
+  "Translator", "Explorer", "Naturalist", "Physical Fitness", "Signaller",
+] as const;
+export const hobbyBadgeEnum = [
+  "Team Player", "Firefighter", "Musician", "Journalist", "Swimmer",
+] as const;
+
 // Users schema
 const userSchema = new mongoose.Schema({
   id: { type: String, unique: true, sparse: true },
@@ -27,6 +37,9 @@ const userSchema = new mongoose.Schema({
   homeAddress: String,
   patrol: { type: String, enum: ["صقر", "فهد", "ثعلب", "ذئب", "نمر", "نسر", "أسد", "غراب", "بلبل", "ديك", "خفاش", "غزال"] },
   status: { type: String, default: "pending", enum: userStatusEnum },
+  mainBadge: { type: String, default: null },
+  proficiencyBadges: [{ type: String, enum: proficiencyBadgeEnum }],
+  hobbyBadges: [{ type: String, enum: hobbyBadgeEnum }],
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
@@ -52,6 +65,9 @@ export type User = {
   homeAddress?: string;
   patrol?: string;
   status?: typeof userStatusEnum[number];
+  mainBadge?: typeof mainBadgeEnum[number] | null;
+  proficiencyBadges?: typeof proficiencyBadgeEnum[number][];
+  hobbyBadges?: typeof hobbyBadgeEnum[number][];
   createdAt?: Date;
   updatedAt?: Date;
 };

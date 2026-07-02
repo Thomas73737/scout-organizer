@@ -3,7 +3,8 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@workspace/replit-auth-web";
 import { useGetMyProfile, useListUsers } from "@workspace/api-client-react";
 import type { ScoutUser } from "@workspace/api-client-react";
-import { Home, CalendarCheck, MessageSquare, UserCircle, Shield, LogOut, Menu, X, Users, Trash2, Megaphone, Bell, BellRing, ChevronDown, Send, CalendarDays, Trophy } from "lucide-react";
+import { Home, CalendarCheck, MessageSquare, UserCircle, Shield, LogOut, Menu, X, Users, Trash2, Megaphone, Bell, BellRing, ChevronDown, Send, CalendarDays, Trophy, Sun, Moon, Medal } from "lucide-react";
+import { useTheme } from "next-themes";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import logoImg from "@/assets/scoutPic/avatars-logo.jpg";
 
 const getInitials = (first: string | null, last: string | null) => {
   return `${first?.[0] ?? ""}${last?.[0] ?? ""}`.toUpperCase() || "?";
@@ -24,24 +26,26 @@ const roleBadge = (role: string) => {
     case "developer":
       return <Badge className="text-[10px] px-1.5 py-0 h-4 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-0">Dev</Badge>;
     default:
-      return <Badge className="text-[10px] px-1.5 py-0 h-4 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-0">Scout</Badge>;
+      return <Badge className="text-[10px] px-1.5 py-0 h-4 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-0">Scout</Badge>;
   }
 };
 
-const pageTitles: Record<string, string> = {
-  "/": "Home / الرئيسية",
+  const pageTitles: Record<string, string> = {
+  "/dashboard": "Home / الرئيسية",
   "/announcements": "Announcements / إعلانات",
+  "/notifications": "Notifications / الإشعارات",
   "/attendance": "Attendance / الحضور",
   "/posts": "Community / المجتمع",
   "/profile": "Profile / الملف الشخصي",
   "/admin": "Admin / الإدارة",
+  "/admin/badges": "Badge Management / إدارة الشارات",
   "/chat": "Chat / الدردشة",
   "/calendar": "Calendar / التقويم",
   "/leaderboard": "Leaderboard / المتصدرين",
-};
+  };
 
 const tabItems = [
-  { label: "Home", href: "/", icon: Home },
+  { label: "Home", href: "/dashboard", icon: Home },
   { label: "Announce", href: "/announcements", icon: Megaphone },
   { label: "Attendance", href: "/attendance", icon: CalendarCheck },
   { label: "Community", href: "/posts", icon: MessageSquare },
@@ -64,6 +68,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   const isLeader = profile?.role === "leader" || profile?.role === "developer";
+  const { theme, setTheme } = useTheme();
 
   React.useEffect(() => {
     const fetchNotifCount = async () => {
@@ -110,7 +115,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   };
 
   const navItems = [
-    { label: "Home / الرئيسية", href: "/", icon: Home },
+    { label: "Home / الرئيسية", href: "/dashboard", icon: Home },
     { label: "Announcements / إعلانات", href: "/announcements", icon: Megaphone },
     { label: "Attendance / الحضور", href: "/attendance", icon: CalendarCheck },
     { label: "Community / المجتمع", href: "/posts", icon: MessageSquare },
@@ -122,6 +127,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   if (isLeader) {
     navItems.push({ label: "Admin / الإدارة", href: "/admin", icon: Shield });
+    navItems.push({ label: "Badges / الشارات", href: "/admin/badges", icon: Medal });
   }
 
   const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
@@ -140,14 +146,32 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <div className="md:hidden flex items-center justify-between px-4 py-3 bg-primary text-primary-foreground shadow-md sticky top-0 z-50 flex-shrink-0">
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <Menu className="h-5 w-5 shrink-0 cursor-pointer opacity-80 hover:opacity-100 transition-opacity" onClick={toggleMobileMenu} />
-          <h1 className="font-serif font-bold text-base truncate">{currentTabLabel || "San George Scouts"}</h1>
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="h-6 w-6 rounded-full overflow-hidden ring-2 ring-white/20 shrink-0">
+              <img
+                src={logoImg}
+                alt="Saint George Scouts"
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <h1 className="font-serif font-bold text-base truncate">{currentTabLabel || "San George Scouts"}</h1>
+          </div>
         </div>
         <div className="flex items-center gap-1">
           <Button
             variant="ghost"
             size="icon"
+            className="text-primary-foreground hover:bg-primary/80 h-8 w-8"
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          >
+            <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="h-5 w-5 absolute rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
             className="text-primary-foreground hover:bg-primary/80 h-8 w-8 relative"
-            onClick={() => window.location.href = "/announcements"}
+            onClick={() => navigate("/notifications")}
           >
             {unreadCount > 0 ? (
               <>
@@ -164,12 +188,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </div>
 
       {/* ───── Desktop Sidebar ───── */}
-      <aside className="hidden md:flex md:flex-col md:w-64 bg-green-900 dark:bg-gray-950 text-white shrink-0 min-h-screen overflow-y-auto">
+      <aside className="hidden md:flex md:flex-col md:w-64 bg-amber-950 dark:bg-gray-950 text-white shrink-0 min-h-screen overflow-y-auto">
         {/* Brand */}
         <div className="px-6 pt-8 pb-6 shrink-0">
           <div className="flex items-center gap-3 mb-1">
-            <div className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center">
-              <span className="font-serif font-bold text-lg text-white">S</span>
+            <div className="h-8 w-8 rounded-lg overflow-hidden ring-2 ring-white/20">
+              <img
+                src={logoImg}
+                alt="Saint George Scouts"
+                className="w-full h-full object-cover"
+              />
             </div>
             <h1 className="font-serif font-bold text-xl text-white">San George Scouts</h1>
           </div>
@@ -188,10 +216,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
                     : "text-white/60 hover:text-white hover:bg-white/5"
                 }`}>
                   <div className={`w-1 h-5 rounded-full shrink-0 transition-colors ${
-                    isActive ? "bg-green-400" : "bg-transparent group-hover:bg-white/20"
+                    isActive ? "bg-amber-400" : "bg-transparent group-hover:bg-white/20"
                   }`} />
                   <item.icon className={`h-4.5 w-4.5 shrink-0 transition-colors ${
-                    isActive ? "text-green-400" : "text-white/40 group-hover:text-white/60"
+                    isActive ? "text-amber-400" : "text-white/40 group-hover:text-white/60"
                   }`} />
                   <span className="text-sm">{item.label}</span>
                 </div>
@@ -199,18 +227,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
             );
           })}
           {/* Notifications */}
-          <Link href="/announcements">
+          <Link href="/notifications">
             <div className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all cursor-pointer group ${
               location === "/notifications"
                 ? "bg-white/10 text-white font-medium shadow-sm"
                 : "text-white/60 hover:text-white hover:bg-white/5"
             }`}>
               <div className={`w-1 h-5 rounded-full shrink-0 transition-colors ${
-                location === "/notifications" ? "bg-green-400" : "bg-transparent group-hover:bg-white/20"
+                location === "/notifications" ? "bg-amber-400" : "bg-transparent group-hover:bg-white/20"
               }`} />
               <div className="relative shrink-0">
                 {unreadCount > 0 ? (
-                  <BellRing className="h-4.5 w-4.5 text-green-400" />
+                  <BellRing className="h-4.5 w-4.5 text-amber-400" />
                 ) : (
                   <Bell className="h-4.5 w-4.5 text-white/40 group-hover:text-white/60" />
                 )}
@@ -225,6 +253,18 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Link>
         </nav>
 
+        {/* Theme toggle */}
+        <div className="px-3 mt-2 shrink-0">
+          <button
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg transition-all text-white/60 hover:text-white hover:bg-white/5"
+          >
+            <Sun className="h-4.5 w-4.5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="h-4.5 w-4.5 absolute rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            <span className="text-sm">Theme / المظهر</span>
+          </button>
+        </div>
+
         {/* User footer */}
         <div className="p-3 mx-3 mb-3 mt-2 rounded-lg bg-white/5 border border-white/10 shrink-0">
           {profile && (
@@ -233,7 +273,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 {profile.profileImageUrl && (
                   <AvatarImage src={profile.profileImageUrl} alt={profile.firstName ?? ""} />
                 )}
-                <AvatarFallback className="bg-green-700 text-white text-xs">
+                <AvatarFallback className="bg-amber-700 text-white text-xs">
                   {getInitials(profile.firstName ?? null, profile.lastName ?? null)}
                 </AvatarFallback>
               </Avatar>
@@ -261,24 +301,33 @@ export function Layout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* ───── Mobile Sidebar Drawer ───── */}
-      <div className={`md:hidden flex flex-col w-72 bg-green-900 dark:bg-gray-950 text-white border-r border-green-800 dark:border-gray-800 shadow-2xl transition-transform duration-300 ease-in-out fixed inset-y-0 left-0 z-[60] overflow-y-auto ${
+      <div className={`md:hidden flex flex-col w-72 bg-amber-950 dark:bg-gray-950 text-white border-r border-amber-900/50 dark:border-gray-800 shadow-2xl transition-transform duration-300 ease-in-out fixed inset-y-0 left-0 z-[60] overflow-y-auto ${
         isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
       }`}>
-        <div className="p-4 border-b border-green-800 dark:border-gray-800 shrink-0">
+        <div className="p-4 border-b border-amber-900/50 dark:border-gray-800 shrink-0">
           <div className="flex items-center justify-between">
-            <h2 className="font-serif font-bold text-lg text-white">San George Scouts</h2>
-            <Button variant="ghost" size="icon" onClick={toggleMobileMenu} className="text-white/80 hover:bg-green-800 hover:text-white h-8 w-8">
+            <div className="flex items-center gap-3">
+              <div className="h-8 w-8 rounded-lg overflow-hidden ring-2 ring-white/20">
+                <img
+                  src={logoImg}
+                  alt="Saint George Scouts"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <h2 className="font-serif font-bold text-lg text-white">San George Scouts</h2>
+            </div>
+            <Button variant="ghost" size="icon" onClick={toggleMobileMenu} className="text-white/80 hover:bg-amber-800 hover:text-white h-8 w-8">
               <X className="h-5 w-5" />
             </Button>
           </div>
-          <p className="text-xs font-sans text-white/60 mt-0.5" dir="rtl">كشافة مار جرجس</p>
+          <p className="text-xs font-sans text-white/60 mt-0.5 ml-11" dir="rtl">كشافة مار جرجس</p>
           {profile && (
-            <div className="flex items-center gap-3 mt-4 pt-3 border-t border-green-800 dark:border-gray-800">
+            <div className="flex items-center gap-3 mt-4 pt-3 border-t border-amber-900/50 dark:border-gray-800">
               <Avatar className="h-10 w-10 shrink-0 ring-2 ring-white/20">
                 {profile.profileImageUrl && (
                   <AvatarImage src={profile.profileImageUrl} alt={profile.firstName ?? ""} />
                 )}
-                <AvatarFallback className="bg-green-700 text-white text-sm">
+                <AvatarFallback className="bg-amber-700 text-white text-sm">
                   {getInitials(profile.firstName ?? null, profile.lastName ?? null)}
                 </AvatarFallback>
               </Avatar>
@@ -295,19 +344,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <Link key={item.href} href={item.href} onClick={() => setIsMobileMenuOpen(false)}>
               <div className={`flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors cursor-pointer ${
                 location === item.href
-                  ? "bg-green-700 text-white font-medium"
-                  : "text-white/80 hover:bg-green-800/50 hover:text-white"
+                  ? "bg-amber-700 text-white font-medium"
+                  : "text-white/80 hover:bg-amber-800/50 hover:text-white"
               }`}>
                 <item.icon className="h-5 w-5 shrink-0" />
                 <span className="text-sm font-medium">{item.label}</span>
               </div>
             </Link>
           ))}
-          <Link href="/announcements" onClick={() => setIsMobileMenuOpen(false)}>
+          <Link href="/notifications" onClick={() => setIsMobileMenuOpen(false)}>
             <div className={`flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors cursor-pointer ${
               location === "/notifications"
-                ? "bg-green-700 text-white font-medium"
-                : "text-white/80 hover:bg-green-800/50 hover:text-white"
+                ? "bg-amber-700 text-white font-medium"
+                : "text-white/80 hover:bg-amber-800/50 hover:text-white"
             }`}>
               <div className="relative">
                 {unreadCount > 0 ? <BellRing className="h-5 w-5 shrink-0" /> : <Bell className="h-5 w-5 shrink-0" />}
@@ -322,7 +371,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Link>
         </nav>
 
-        <div className="p-3 border-t border-green-800 dark:border-gray-800 space-y-1 shrink-0">
+        <div className="p-3 border-t border-amber-900/50 dark:border-gray-800 space-y-1 shrink-0">
+          <button
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="flex items-center gap-3 px-3 py-2.5 w-full rounded-lg transition-all text-white/70 hover:text-white hover:bg-amber-800/50"
+          >
+            <Sun className="h-5 w-5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+            <Moon className="h-5 w-5 absolute rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+            <span className="text-sm">Theme / المظهر</span>
+          </button>
           <Button
             variant="ghost"
             size="sm"
@@ -335,7 +392,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </Button>
           <Button
             variant="ghost"
-            className="w-full justify-start text-white/70 hover:text-white hover:bg-green-800/50 gap-3 h-auto py-2"
+            className="w-full justify-start text-white/70 hover:text-white hover:bg-amber-800/50 gap-3 h-auto py-2"
             onClick={() => logout()}
           >
             <LogOut className="h-5 w-5 shrink-0" />
@@ -352,7 +409,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           </div>
           <div className="flex items-center gap-3">
             {/* Notification bell */}
-            <Link href="/announcements">
+            <Link href="/notifications">
               <Button variant="ghost" size="icon" className="relative h-9 w-9 text-muted-foreground hover:text-foreground hover:bg-muted/50">
                 {unreadCount > 0 ? (
                   <>
@@ -467,16 +524,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
                       </div>
                       {roleBadge(user.role)}
                     </button>
+                    {user.replitId !== profile?.replitId && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => navigate(`/chat?user=${user.replitId}`)}
+                            className="h-7 w-7 shrink-0 flex items-center justify-center rounded-md text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-primary/10 hover:text-primary transition-all"
+                          >
+                            <Send className="h-3.5 w-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="left">Chat / دردشة</TooltipContent>
+                      </Tooltip>
+                    )}
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <button
-                          onClick={() => navigate(`/chat?user=${user.replitId}`)}
+                          onClick={() => navigate(user.replitId === profile?.replitId ? `/profile` : `/profile/${user.replitId}`)}
                           className="h-7 w-7 shrink-0 flex items-center justify-center rounded-md text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-primary/10 hover:text-primary transition-all"
                         >
-                          <Send className="h-3.5 w-3.5" />
+                          <UserCircle className="h-3.5 w-3.5" />
                         </button>
                       </TooltipTrigger>
-                      <TooltipContent side="left">Chat / دردشة</TooltipContent>
+                      <TooltipContent side="left">Profile / ملف شخصي</TooltipContent>
                     </Tooltip>
                   </div>
                 ))}
@@ -494,11 +564,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
             return (
               <Link key={tab.href} href={tab.href}>
                 <div className={`flex flex-col items-center justify-center gap-0.5 px-3 py-1 min-w-0 transition-colors ${
-                  isActive ? "text-green-800 dark:text-green-400" : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
+                  isActive ? "text-amber-800 dark:text-amber-400" : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200"
                 }`}>
                   <tab.icon className="h-5 w-5" />
                   <span className={`text-[10px] leading-tight ${isActive ? "font-bold" : "font-medium"}`}>{tab.label}</span>
-                  {isActive && <span className="h-0.5 w-4 rounded-full bg-green-800 dark:bg-green-400 mt-0.5" />}
+                  {isActive && <span className="h-0.5 w-4 rounded-full bg-amber-800 dark:bg-amber-400 mt-0.5" />}
                 </div>
               </Link>
             );
@@ -557,11 +627,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   </div>
                   {roleBadge(user.role)}
                 </button>
+                {user.replitId !== profile?.replitId && (
+                  <button
+                    onClick={() => navigate(`/chat?user=${user.replitId}`)}
+                    className="h-8 w-8 shrink-0 flex items-center justify-center rounded-md text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-primary/10 hover:text-primary transition-all"
+                  >
+                    <Send className="h-4 w-4" />
+                  </button>
+                )}
                 <button
-                  onClick={() => navigate(`/chat?user=${user.replitId}`)}
+                  onClick={() => { navigate(user.replitId === profile?.replitId ? `/profile` : `/profile/${user.replitId}`); }}
                   className="h-8 w-8 shrink-0 flex items-center justify-center rounded-md text-muted-foreground opacity-0 group-hover:opacity-100 hover:bg-primary/10 hover:text-primary transition-all"
                 >
-                  <Send className="h-4 w-4" />
+                  <UserCircle className="h-4 w-4" />
                 </button>
               </div>
             ))}
@@ -594,15 +672,31 @@ export function Layout({ children }: { children: React.ReactNode }) {
                   <p className="text-sm text-muted-foreground mt-2">{selectedUser.email}</p>
                 )}
               </div>
-              <Button
-                className="w-full gap-2"
-                onClick={() => {
-                  navigate(`/chat?user=${selectedUser.replitId}`);
-                }}
-              >
-                <Send className="h-4 w-4" />
-                Chat / دردشة
-              </Button>
+              <div className="flex gap-2 w-full">
+                <Button
+                  className="flex-1 gap-2"
+                  onClick={() => {
+                    navigate(selectedUser.replitId === profile?.replitId ? `/profile` : `/profile/${selectedUser.replitId}`);
+                    setSelectedUser(null);
+                  }}
+                >
+                  <UserCircle className="h-4 w-4" />
+                  Profile / ملف شخصي
+                </Button>
+                {selectedUser.replitId !== profile?.replitId && (
+                  <Button
+                    className="flex-1 gap-2"
+                    variant="outline"
+                    onClick={() => {
+                      navigate(`/chat?user=${selectedUser.replitId}`);
+                      setSelectedUser(null);
+                    }}
+                  >
+                    <Send className="h-4 w-4" />
+                    Chat / دردشة
+                  </Button>
+                )}
+              </div>
             </div>
           )}
         </DialogContent>

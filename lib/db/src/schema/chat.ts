@@ -6,6 +6,8 @@ const chatMessageSchema = new mongoose.Schema({
   receiverId: { type: String, required: true, index: true },
   content: { type: String, required: true },
   isRead: { type: Boolean, default: false },
+  isEdited: { type: Boolean, default: false },
+  isDeleted: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
 });
 
@@ -21,6 +23,8 @@ export type ChatMessage = {
   receiverId: string;
   content: string;
   isRead?: boolean;
+  isEdited?: boolean;
+  isDeleted?: boolean;
   createdAt?: Date;
 };
 

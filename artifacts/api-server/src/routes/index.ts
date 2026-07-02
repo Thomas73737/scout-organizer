@@ -12,6 +12,7 @@ import pushNotificationsRouter from "./pushNotifications";
 import chatRouter from "./chat";
 import pointsRouter from "./points";
 import calendarRouter from "./calendar";
+import badgesRouter from "./badges";
 
 const router: IRouter = Router();
 
@@ -28,5 +29,6 @@ router.use(pushNotificationsRouter);
 router.use(chatRouter);
 router.use(pointsRouter);
 router.use(calendarRouter);
+router.use(badgesRouter);
 
 export default router;

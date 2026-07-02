@@ -36,6 +36,9 @@ async function getUserWithRole(userId: string) {
     profileImageUrl: user.profileImageUrl,
     role: profile.role,
     patrol: user.patrol,
+    mainBadge: user.mainBadge || null,
+    proficiencyBadges: user.proficiencyBadges || [],
+    hobbyBadges: user.hobbyBadges || [],
     whatsappNumber: user.whatsappNumber,
     parentsWhatsappNumber: user.parentsWhatsappNumber,
     homeAddress: user.homeAddress,
@@ -247,11 +250,6 @@ router.get("/users", async (req, res) => {
     return;
   }
   await ensureProfile(req.user.id);
-  const hasAccess = await isDeveloperOrLeader(req.user.id);
-  if (!hasAccess) {
-    res.status(403).json({ error: "Leaders and developers only" });
-    return;
-  }
 
   const profiles = await ScoutProfileModel.find().sort({ createdAt: -1 });
   const users = await Promise.all(
@@ -266,6 +264,9 @@ router.get("/users", async (req, res) => {
         profileImageUrl: user?.profileImageUrl,
         role: profile.role,
         patrol: user?.patrol,
+        mainBadge: user?.mainBadge || null,
+        proficiencyBadges: user?.proficiencyBadges || [],
+        hobbyBadges: user?.hobbyBadges || [],
         createdAt: profile.createdAt,
       };
     })
@@ -285,6 +286,22 @@ router.get("/users/me", async (req, res) => {
     res.status(404).json({ error: "Profile not found" });
     return;
   }
+  res.json(profile);
+});
+
+// GET /api/users/:userId/profile - Get any user's public profile with badges
+router.get("/users/:userId/profile", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const profile = await getUserWithRole(req.params.userId);
+  if (!profile) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+
   res.json(profile);
 });
 

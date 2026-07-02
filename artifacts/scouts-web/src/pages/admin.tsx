@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Shield, Users, Trash2, Download, Eye, Award, Plus, Loader2 } from "lucide-react";
+import { Shield, Users, Trash2, Download, Eye, Award, Plus, Loader2, Medal, Star } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -28,6 +28,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { BadgeChip } from "@/components/badges/BadgeCard";
+import { MAIN_BADGES, PROFICIENCY_BADGES, HOBBY_BADGES } from "@/components/badges/badge-constants";
 
 export default function Admin() {
   const { data: users, isLoading } = useListUsers();
@@ -148,6 +150,13 @@ export default function Admin() {
   const [pointsAmount, setPointsAmount] = useState("");
   const [pointsReason, setPointsReason] = useState("");
   const [awardingPoints, setAwardingPoints] = useState(false);
+
+  // Badge management state
+  const [badgeDialogOpen, setBadgeDialogOpen] = useState(false);
+  const [badgeTargetUser, setBadgeTargetUser] = useState<{
+    id: string; firstName: string; lastName: string;
+    mainBadge?: string | null; proficiencyBadges?: string[]; hobbyBadges?: string[];
+  } | null>(null);
 
   const fixImageUrl = (url: string | undefined) => {
     if (!url) return undefined;
@@ -638,17 +647,36 @@ export default function Admin() {
                     >
                       Unban
                     </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-xs px-2 sm:px-3"
+                      onClick={() => {
+                        setBadgeTargetUser({
+                          id: user.replitId,
+                          firstName: user.firstName ?? "",
+                          lastName: user.lastName ?? "",
+                          mainBadge: user.mainBadge ?? null,
+                          proficiencyBadges: user.proficiencyBadges ?? [],
+                          hobbyBadges: user.hobbyBadges ?? [],
+                        });
+                        setBadgeDialogOpen(true);
+                      }}
+                    >
+                      <Medal className="h-3 w-3 sm:mr-1" />
+                      <span className="hidden sm:inline">Badges</span>
+                    </Button>
                     {isDeveloper && (
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        className="h-8 text-xs px-2 sm:px-3"
-                        onClick={() => handleDeleteUser(user.replitId)}
-                        disabled={deleteUserMutation.isPending}
-                      >
-                        <Trash2 className="h-3 w-3 sm:mr-1" />
-                        <span className="hidden sm:inline">Delete</span>
-                      </Button>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      className="h-8 text-xs px-2 sm:px-3"
+                      onClick={() => handleDeleteUser(user.replitId)}
+                      disabled={deleteUserMutation.isPending}
+                    >
+                      <Trash2 className="h-3 w-3 sm:mr-1" />
+                      <span className="hidden sm:inline">Delete</span>
+                    </Button>
                     )}
                   </div>
                 </div>
@@ -700,6 +728,251 @@ export default function Admin() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Badge Management Dialog */}
+      <Dialog open={badgeDialogOpen} onOpenChange={(open) => {
+        if (!open) setBadgeDialogOpen(false);
+      }}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Medal className="h-5 w-5 text-amber-500" />
+              Manage Badges: {badgeTargetUser?.firstName} {badgeTargetUser?.lastName}
+            </DialogTitle>
+          </DialogHeader>
+          {badgeTargetUser && (
+            <BadgeManager
+              userId={badgeTargetUser.id}
+              initialMainBadge={badgeTargetUser.mainBadge ?? null}
+              initialProficiency={badgeTargetUser.proficiencyBadges ?? []}
+              initialHobby={badgeTargetUser.hobbyBadges ?? []}
+              onClose={() => {
+                setBadgeDialogOpen(false);
+                queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() });
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function BadgeManager({
+  userId, initialMainBadge, initialProficiency, initialHobby, onClose,
+}: {
+  userId: string;
+  initialMainBadge: string | null;
+  initialProficiency: string[];
+  initialHobby: string[];
+  onClose: () => void;
+}) {
+  const { toast } = useToast();
+  const [mainBadge, setMainBadge] = useState<string | null>(initialMainBadge);
+  const [proficiencyBadges, setProficiencyBadges] = useState<string[]>(initialProficiency);
+  const [hobbyBadges, setHobbyBadges] = useState<string[]>(initialHobby);
+  const [selectedProfBadge, setSelectedProfBadge] = useState("");
+  const [selectedHobbyBadge, setSelectedHobbyBadge] = useState("");
+  const [loading, setLoading] = useState<string | null>(null);
+
+  const apiCall = async (method: string, path: string, body?: any) => {
+    setLoading(path);
+    try {
+      const res = await fetch(path, {
+        method,
+        headers: body ? { "Content-Type": "application/json" } : undefined,
+        body: body ? JSON.stringify(body) : undefined,
+        credentials: "include",
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Request failed");
+      }
+      return await res.json();
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleSetMainBadge = async (badge: string) => {
+    try {
+      await apiCall("PUT", `/api/badges/${userId}/main-badge`, { badge });
+      setMainBadge(badge);
+      toast({ title: `Main badge set to ${badge}` });
+    } catch (err: any) {
+      toast({ title: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleRemoveMainBadge = async () => {
+    try {
+      await apiCall("DELETE", `/api/badges/${userId}/main-badge`);
+      setMainBadge(null);
+      toast({ title: "Main badge removed" });
+    } catch (err: any) {
+      toast({ title: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleAddProficiency = async () => {
+    if (!selectedProfBadge) return;
+    try {
+      const result = await apiCall("POST", `/api/badges/${userId}/proficiency`, { badge: selectedProfBadge });
+      setProficiencyBadges(result.proficiencyBadges);
+      setSelectedProfBadge("");
+      toast({ title: `Added ${selectedProfBadge}` });
+    } catch (err: any) {
+      toast({ title: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleRemoveProficiency = async (badge: string) => {
+    try {
+      const result = await apiCall("DELETE", `/api/badges/${userId}/proficiency/${encodeURIComponent(badge)}`);
+      setProficiencyBadges(result.proficiencyBadges);
+      toast({ title: `Removed ${badge}` });
+    } catch (err: any) {
+      toast({ title: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleAddHobby = async () => {
+    if (!selectedHobbyBadge) return;
+    try {
+      const result = await apiCall("POST", `/api/badges/${userId}/hobby`, { badge: selectedHobbyBadge });
+      setHobbyBadges(result.hobbyBadges);
+      setSelectedHobbyBadge("");
+      toast({ title: `Added ${selectedHobbyBadge}` });
+    } catch (err: any) {
+      toast({ title: err.message, variant: "destructive" });
+    }
+  };
+
+  const handleRemoveHobby = async (badge: string) => {
+    try {
+      const result = await apiCall("DELETE", `/api/badges/${userId}/hobby/${encodeURIComponent(badge)}`);
+      setHobbyBadges(result.hobbyBadges);
+      toast({ title: `Removed ${badge}` });
+    } catch (err: any) {
+      toast({ title: err.message, variant: "destructive" });
+    }
+  };
+
+  const availableProficiency = PROFICIENCY_BADGES.filter((b) => !proficiencyBadges.includes(b));
+  const availableHobby = HOBBY_BADGES.filter((b) => !hobbyBadges.includes(b));
+
+  return (
+    <div className="space-y-5">
+      {/* Main Badge */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <Star className="h-4 w-4 text-amber-500" />
+          <h4 className="text-sm font-semibold">Main Badge</h4>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select
+            value={mainBadge || ""}
+            onValueChange={(val) => handleSetMainBadge(val)}
+          >
+            <SelectTrigger className="w-48 h-8 text-xs">
+              <SelectValue placeholder="Select main badge..." />
+            </SelectTrigger>
+            <SelectContent>
+              {MAIN_BADGES.map((b) => (
+                <SelectItem key={b} value={b} className="text-xs">{b}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {mainBadge && (
+            <Button size="sm" variant="destructive" className="h-8 text-xs" onClick={handleRemoveMainBadge}>
+              Remove
+            </Button>
+          )}
+        </div>
+        {mainBadge && (
+          <div className="mt-2">
+            <BadgeChip name={mainBadge} size="md" onRemove={handleRemoveMainBadge} />
+          </div>
+        )}
+      </div>
+
+      <hr className="border-border" />
+
+      {/* Proficiency Badges */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <Medal className="h-4 w-4 text-blue-500" />
+          <h4 className="text-sm font-semibold">Proficiency Badges</h4>
+        </div>
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {proficiencyBadges.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic">No proficiency badges</p>
+          ) : (
+            proficiencyBadges.map((b) => (
+              <BadgeChip key={b} name={b} size="sm" onRemove={() => handleRemoveProficiency(b)} />
+            ))
+          )}
+        </div>
+        <div className="flex gap-2">
+          <Select value={selectedProfBadge} onValueChange={setSelectedProfBadge}>
+            <SelectTrigger className="flex-1 h-8 text-xs">
+              <SelectValue placeholder="Add proficiency badge..." />
+            </SelectTrigger>
+            <SelectContent>
+              {availableProficiency.map((b) => (
+                <SelectItem key={b} value={b} className="text-xs">{b}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            size="sm"
+            className="h-8 text-xs"
+            onClick={handleAddProficiency}
+            disabled={!selectedProfBadge}
+          >
+            <Plus className="h-3 w-3 mr-1" /> Add
+          </Button>
+        </div>
+      </div>
+
+      <hr className="border-border" />
+
+      {/* Hobby Badges */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <Star className="h-4 w-4 text-green-500" />
+          <h4 className="text-sm font-semibold">Hobby Badges</h4>
+        </div>
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {hobbyBadges.length === 0 ? (
+            <p className="text-xs text-muted-foreground italic">No hobby badges</p>
+          ) : (
+            hobbyBadges.map((b) => (
+              <BadgeChip key={b} name={b} size="sm" onRemove={() => handleRemoveHobby(b)} />
+            ))
+          )}
+        </div>
+        <div className="flex gap-2">
+          <Select value={selectedHobbyBadge} onValueChange={setSelectedHobbyBadge}>
+            <SelectTrigger className="flex-1 h-8 text-xs">
+              <SelectValue placeholder="Add hobby badge..." />
+            </SelectTrigger>
+            <SelectContent>
+              {availableHobby.map((b) => (
+                <SelectItem key={b} value={b} className="text-xs">{b}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            size="sm"
+            className="h-8 text-xs"
+            onClick={handleAddHobby}
+            disabled={!selectedHobbyBadge}
+          >
+            <Plus className="h-3 w-3 mr-1" /> Add
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

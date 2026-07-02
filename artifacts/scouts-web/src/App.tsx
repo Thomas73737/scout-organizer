@@ -9,8 +9,10 @@ import { Layout } from "@/components/layout";
 import { Loader2 } from "lucide-react";
 import { PushNotificationProvider } from "@/hooks/PushNotificationContext";
 
+import Landing from "@/pages/landing";
 import Home from "@/pages/home";
 import Announcements from "@/pages/announcements";
+import Notifications from "@/pages/notifications";
 import Attendance from "@/pages/attendance";
 import Posts from "@/pages/posts";
 import Profile from "@/pages/profile";
@@ -20,6 +22,8 @@ import Waiting from "@/pages/waiting";
 import Chat from "@/pages/chat";
 import CalendarPage from "@/pages/calendar-scout";
 import Leaderboard from "@/pages/leaderboard";
+import BadgesAdmin from "@/pages/badges-admin";
+import PublicProfile from "@/pages/public-profile";
 
 const queryClient = new QueryClient();
 
@@ -36,7 +40,7 @@ function ProtectedRoute({ component: Component, adminOnly = false }: { component
   }
 
   if (adminOnly && profile?.role !== "leader" && profile?.role !== "developer") {
-    return <Redirect to="/" />;
+    return <Redirect to="/dashboard" />;
   }
 
   return (
@@ -53,11 +57,15 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/waiting" component={Waiting} />
-      <Route path="/">
+      <Route path="/" component={Landing} />
+      <Route path="/dashboard">
         <ProtectedRoute component={Home} />
       </Route>
       <Route path="/announcements">
         <ProtectedRoute component={Announcements} />
+      </Route>
+      <Route path="/notifications">
+        <ProtectedRoute component={Notifications} />
       </Route>
       <Route path="/attendance">
         <ProtectedRoute component={Attendance} />
@@ -68,8 +76,14 @@ function Router() {
       <Route path="/profile">
         <ProtectedRoute component={Profile} />
       </Route>
+      <Route path="/profile/:userId">
+        <ProtectedRoute component={PublicProfile} />
+      </Route>
       <Route path="/admin">
         <ProtectedRoute component={Admin} adminOnly={true} />
+      </Route>
+      <Route path="/admin/badges">
+        <ProtectedRoute component={BadgesAdmin} adminOnly={true} />
       </Route>
       <Route path="/chat">
         <ProtectedRoute component={Chat} />

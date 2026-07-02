@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
-import { ChatMessageModel, UserModel, ScoutProfileModel } from "@workspace/db";
+import { ChatMessageModel, UserModel, ScoutProfileModel, NotificationModel, PushSubscriptionModel } from "@workspace/db";
+import { sendPushNotificationToMany } from "../lib/pushNotification";
 
 const router = Router();
 
@@ -44,13 +45,14 @@ router.get("/chat/conversations", async (req, res) => {
   for (const msg of messages) {
     const otherId = msg.senderId === userId ? msg.receiverId : msg.senderId;
     const other = userMap.get(otherId);
+    const lastMsg = msg.isDeleted ? "Message deleted" : msg.content;
     if (!conversationMap.has(otherId)) {
       conversationMap.set(otherId, {
         userId: otherId,
         firstName: other?.firstName ?? null,
         lastName: other?.lastName ?? null,
         profileImageUrl: other?.profileImageUrl ?? null,
-        lastMessage: msg.content,
+        lastMessage: lastMsg,
         lastMessageTime: msg.createdAt!,
         unreadCount: msg.receiverId === userId && !msg.isRead ? 1 : 0,
       });
@@ -95,6 +97,8 @@ router.get("/chat/messages/:otherUserId", async (req, res) => {
     ...msg,
     senderName: userMap.get(msg.senderId) ? `${userMap.get(msg.senderId)!.firstName ?? ""} ${userMap.get(msg.senderId)!.lastName ?? ""}`.trim() : null,
     senderImageUrl: userMap.get(msg.senderId)?.profileImageUrl ?? null,
+    isEdited: msg.isEdited ?? false,
+    isDeleted: msg.isDeleted ?? false,
   }));
 
   await ChatMessageModel.updateMany(
@@ -132,7 +136,94 @@ router.post("/chat/send", async (req, res) => {
     isRead: false,
   });
 
+  const sender = await UserModel.findOne({ id: req.user.id }).lean();
+  const senderName = sender ? `${sender.firstName ?? ""} ${sender.lastName ?? ""}`.trim() : "Unknown";
+
+  await NotificationModel.create({
+    id: randomUUID(),
+    userId: receiverId,
+    type: "message",
+    title: "New Message",
+    message: content,
+    relatedId: message.id,
+    authorName: senderName,
+    isRead: false,
+  });
+
+  const subscriptions = await PushSubscriptionModel.find({ userId: receiverId }).lean();
+  if (subscriptions.length > 0) {
+    const pushResult = await sendPushNotificationToMany(
+      subscriptions.map((s) => ({ endpoint: s.endpoint, keys: s.keys })),
+      senderName,
+      content,
+      { type: "message", messageId: message.id, url: "/chat" },
+    );
+    if (pushResult.failed.length > 0) {
+      await PushSubscriptionModel.deleteMany({
+        endpoint: { $in: pushResult.failed.map((f) => f.subscription.endpoint) },
+      });
+    }
+  }
+
   res.status(201).json(message.toObject());
+});
+
+router.put("/chat/messages/:messageId", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const { messageId } = req.params;
+  const { content } = req.body as { content?: string };
+  if (!content || !content.trim()) {
+    res.status(400).json({ error: "Content is required" });
+    return;
+  }
+
+  const message = await ChatMessageModel.findOne({ id: messageId });
+  if (!message) {
+    res.status(404).json({ error: "Message not found" });
+    return;
+  }
+
+  if (message.senderId !== req.user.id) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  message.content = content.trim();
+  message.isEdited = true;
+  await message.save();
+
+  res.json(message.toObject());
+});
+
+router.delete("/chat/messages/:messageId", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const { messageId } = req.params;
+
+  const message = await ChatMessageModel.findOne({ id: messageId });
+  if (!message) {
+    res.status(404).json({ error: "Message not found" });
+    return;
+  }
+
+  if (message.senderId !== req.user.id) {
+    res.status(403).json({ error: "Forbidden" });
+    return;
+  }
+
+  message.content = "This message was deleted";
+  message.isDeleted = true;
+  message.isEdited = false;
+  await message.save();
+
+  res.json({ success: true });
 });
 
 router.get("/chat/unread-count", async (req, res) => {

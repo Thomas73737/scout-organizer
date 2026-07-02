@@ -111,9 +111,8 @@ router.get("/attendance/sessions/:sessionId", async (req, res) => {
   const enrichedRecords = await Promise.all(
     records.map(async (record) => {
       const user = await UserModel.findOne({ id: record.userId }).lean();
-      const profile = await ScoutProfileModel.findOne({ userId: record.userId }).lean();
       return {
-        userId: profile?.id,
+        userId: record.userId,
         scoutName: user ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() : null,
         profileImageUrl: user?.profileImageUrl ?? null,
         status: record.status,
@@ -187,9 +186,8 @@ router.post("/attendance/sessions/:sessionId/records", async (req, res) => {
   const enrichedRecords = await Promise.all(
     records.map(async (record) => {
       const user = await UserModel.findOne({ id: record.userId }).lean();
-      const profile = await ScoutProfileModel.findOne({ userId: record.userId }).lean();
       return {
-        userId: profile?.id,
+        userId: record.userId,
         scoutName: user ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() : null,
         profileImageUrl: user?.profileImageUrl ?? null,
         status: record.status,
@@ -229,6 +227,39 @@ router.delete("/attendance/sessions/:sessionId/records/:userId", async (req, res
   } catch (err: any) {
     console.error("Failed to delete attendance record:", err?.message ?? err);
     res.status(500).json({ error: "Failed to delete attendance record" });
+  }
+});
+
+router.delete("/attendance/sessions/:sessionId", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  const hasAccess = await isDeveloperOrLeader(req.user.id);
+  if (!hasAccess) {
+    res.status(403).json({ error: "Leaders and developers only" });
+    return;
+  }
+
+  const { sessionId } = req.params;
+  if (!sessionId) {
+    res.status(400).json({ error: "Invalid session ID" });
+    return;
+  }
+
+  const session = await AttendanceSessionModel.findOne({ id: sessionId });
+  if (!session) {
+    res.status(404).json({ error: "Session not found" });
+    return;
+  }
+
+  try {
+    await AttendanceRecordModel.deleteMany({ sessionId });
+    await AttendanceSessionModel.deleteOne({ id: sessionId });
+    res.json({ message: "Attendance session deleted successfully" });
+  } catch (err: any) {
+    console.error("Failed to delete attendance session:", err?.message ?? err);
+    res.status(500).json({ error: "Failed to delete attendance session" });
   }
 });
 

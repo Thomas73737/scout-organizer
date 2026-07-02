@@ -11,7 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@workspace/replit-auth-web";
 import { usePushNotificationContext } from "@/hooks/PushNotificationContext";
-import { UserCircle, Mail, CalendarCheck, Camera, Lock, X, Bell, BellOff } from "lucide-react";
+import { UserCircle, Mail, CalendarCheck, Camera, Lock, X, Bell, BellOff, Award, Target, Heart } from "lucide-react";
+import { BadgeSection } from "@/components/badges/BadgeCard";
 
 export default function Profile() {
   const { data: profile, isLoading: profileLoading } = useGetMyProfile();
@@ -324,6 +325,49 @@ export default function Profile() {
               </Button>
             )}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Badges Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Award className="h-4 w-4 text-amber-500" />
+            Badges / الشارات
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {profileLoading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+            </div>
+          ) : (
+            <>
+              <BadgeSection
+                title="Main Badge"
+                badges={profile?.mainBadge ? [profile.mainBadge] : []}
+                category="main"
+                emptyMessage="No Main Badge"
+                emptyIcon={Award}
+              />
+              <BadgeSection
+                title="Proficiency Badges"
+                badges={profile?.proficiencyBadges || []}
+                category="proficiency"
+                emptyMessage="No proficiency badges yet"
+                emptyIcon={Target}
+              />
+              <BadgeSection
+                title="Hobby Badges"
+                badges={profile?.hobbyBadges || []}
+                category="hobby"
+                emptyMessage="No hobby badges yet"
+                emptyIcon={Heart}
+              />
+            </>
+          )}
         </CardContent>
       </Card>
 

@@ -8,6 +8,7 @@ import {
   useGetMyAttendanceSummary,
   getListAttendanceSessionsQueryKey,
   getGetAttendanceSessionQueryKey,
+  getGetMyAttendanceSummaryQueryKey,
 } from "@workspace/api-client-react";
 import { useGetMyProfile } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -49,12 +50,14 @@ function PatrolAttendanceView({ patrol, scouts, onClose }: { patrol: string; sco
   const toggleStatus = (scoutId: string) => {
     setAttendanceState((prev) => {
       const current = prev[scoutId] ?? { status: "absent" as const, excuse: false, hasGear: false };
+      const newStatus = current.status === "present" ? "absent" : "present";
       return {
         ...prev,
         [scoutId]: {
           ...current,
-          status: current.status === "present" ? "absent" : "present",
-          excuse: current.status === "present" ? false : current.excuse,
+          status: newStatus,
+          excuse: newStatus === "present" ? false : current.excuse,
+          hasGear: newStatus === "absent" ? false : current.hasGear,
         },
       };
     });
@@ -99,7 +102,7 @@ function PatrolAttendanceView({ patrol, scouts, onClose }: { patrol: string; sco
           userId: scout.replitId,
           status: state.status,
           excuse: state.status === "absent" ? state.excuse : undefined,
-          hasGear: state.hasGear,
+          hasGear: state.status === "present" ? state.hasGear : undefined,
         };
       });
 
@@ -171,19 +174,21 @@ function PatrolAttendanceView({ patrol, scouts, onClose }: { patrol: string; sco
                     </button>
                   )}
 
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); toggleHasGear(scout.replitId); }}
-                    className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md border transition-colors ${
-                      state.hasGear
-                        ? "bg-sky-50 border-sky-200 text-sky-700 dark:bg-sky-900/20 dark:border-sky-800 dark:text-sky-400"
-                        : "bg-background border-border text-muted-foreground"
-                    }`}
-                    title={state.hasGear ? "Has gear / معاه العدة" : "No gear / من غير العدة"}
-                  >
-                    <Shirt className="h-3.5 w-3.5" />
-                    <span>{state.hasGear ? "Has gear" : "No gear"}</span>
-                  </button>
+                  {state.status === "present" && (
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); toggleHasGear(scout.replitId); }}
+                      className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md border transition-colors ${
+                        state.hasGear
+                          ? "bg-sky-50 border-sky-200 text-sky-700 dark:bg-sky-900/20 dark:border-sky-800 dark:text-sky-400"
+                          : "bg-background border-border text-muted-foreground"
+                      }`}
+                      title={state.hasGear ? "Has gear / معاه العدة" : "No gear / من غير العدة"}
+                    >
+                      <Shirt className="h-3.5 w-3.5" />
+                      <span>{state.hasGear ? "Has gear" : "No gear"}</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -255,12 +260,14 @@ function AttendanceSessionDetail({ sessionId, onClose }: { sessionId: string; on
   const toggleStatus = (userId: string) => {
     setAttendance((prev) => {
       const current = prev[userId] ?? { status: "absent" as const, excuse: false, hasGear: false };
+      const newStatus = current.status === "present" ? "absent" : "present";
       return {
         ...prev,
         [userId]: {
           ...current,
-          status: current.status === "present" ? "absent" : "present",
-          excuse: current.status === "present" ? false : current.excuse,
+          status: newStatus,
+          excuse: newStatus === "present" ? false : current.excuse,
+          hasGear: newStatus === "absent" ? false : current.hasGear,
         },
       };
     });
@@ -289,7 +296,7 @@ function AttendanceSessionDetail({ sessionId, onClose }: { sessionId: string; on
         userId: u.replitId,
         status: state.status,
         excuse: state.status === "absent" ? state.excuse : undefined,
-        hasGear: state.hasGear,
+        hasGear: state.status === "present" ? state.hasGear : undefined,
       };
     });
 
@@ -378,7 +385,7 @@ function AttendanceSessionDetail({ sessionId, onClose }: { sessionId: string; on
                       </button>
                     )}
 
-                    {isLeader && (
+                    {isLeader && state.status === "present" && (
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); toggleHasGear(scout.replitId); }}
@@ -435,6 +442,8 @@ export default function Attendance() {
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [selectedPatrol, setSelectedPatrol] = useState<string | null>(null);
+  const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
+  const [confirmDeleteSessionId, setConfirmDeleteSessionId] = useState<string | null>(null);
 
   const isLeader = profile?.role === "leader" || profile?.role === "developer";
   const isAdmin = profile?.role === "leader" || profile?.role === "developer";
@@ -455,6 +464,24 @@ export default function Attendance() {
     resolver: zodResolver(sessionSchema),
     defaultValues: { title: "", sessionDate: "", notes: "" },
   });
+
+  const handleDeleteSession = async (sessionId: string) => {
+    setDeletingSessionId(sessionId);
+    try {
+      const res = await fetch(`/api/attendance/sessions/${sessionId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete");
+      queryClient.invalidateQueries({ queryKey: getListAttendanceSessionsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getGetMyAttendanceSummaryQueryKey() });
+      toast({ title: "Session deleted" });
+    } catch {
+      toast({ title: "Failed to delete session", variant: "destructive" });
+    } finally {
+      setDeletingSessionId(null);
+      setConfirmDeleteSessionId(null);
+    }
+  };
 
   const onSubmit = (values: SessionForm) => {
     createMutation.mutate(
@@ -661,6 +688,20 @@ export default function Attendance() {
                           </Badge>
                         )}
                       </div>
+                      {isLeader && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setConfirmDeleteSessionId(session.id);
+                          }}
+                          disabled={deletingSessionId === session.id}
+                          className="p-1.5 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                          title="Delete session"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                       <ChevronRight className="h-4 w-4 text-muted-foreground" />
                     </div>
                   </div>
@@ -726,6 +767,31 @@ export default function Attendance() {
               </DialogFooter>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Session Confirmation Dialog */}
+      <Dialog open={confirmDeleteSessionId !== null} onOpenChange={(open) => !open && setConfirmDeleteSessionId(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Session / حذف الجلسة</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Are you sure you want to delete this session and all its attendance records? This action cannot be undone.
+          </p>
+          <p className="text-sm font-medium text-destructive">
+            هل أنت متأكد من حذف الجلسة وجميع سجلات الحضور؟ لا يمكن التراجع عن هذا الإجراء.
+          </p>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setConfirmDeleteSessionId(null)}>Cancel / إلغاء</Button>
+            <Button
+              variant="destructive"
+              disabled={deletingSessionId !== null}
+              onClick={() => confirmDeleteSessionId && handleDeleteSession(confirmDeleteSessionId)}
+            >
+              {deletingSessionId ? "Deleting..." : "Delete / حذف"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

@@ -13,6 +13,8 @@ tags:
     description: Browser authentication endpoints
   - name: Users
     description: User management
+  - name: Badges
+    description: Badge management
   - name: Attendance
     description: Attendance tracking
   - name: Announcements
@@ -157,6 +159,165 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ScoutUser'
+
+  /badges/{userId}:
+    get:
+      tags: [Badges]
+      operationId: getUserBadges
+      summary: Get a user's badges (public)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User badges
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserBadges'
+
+  /badges/{userId}/main-badge:
+    put:
+      tags: [Badges]
+      operationId: setMainBadge
+      summary: Set a user's main badge (admin only)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BadgeAssignment'
+      responses:
+        '200':
+          description: Badge updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserBadges'
+    delete:
+      tags: [Badges]
+      operationId: removeMainBadge
+      summary: Remove a user's main badge (admin only)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Badge removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserBadges'
+
+  /badges/{userId}/proficiency:
+    post:
+      tags: [Badges]
+      operationId: addProficiencyBadge
+      summary: Add a proficiency badge (admin only)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BadgeAssignment'
+      responses:
+        '200':
+          description: Badge added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProficiencyBadgesResponse'
+
+  /badges/{userId}/proficiency/{badgeName}:
+    delete:
+      tags: [Badges]
+      operationId: removeProficiencyBadge
+      summary: Remove a proficiency badge (admin only)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: badgeName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Badge removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProficiencyBadgesResponse'
+
+  /badges/{userId}/hobby:
+    post:
+      tags: [Badges]
+      operationId: addHobbyBadge
+      summary: Add a hobby badge (admin only)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BadgeAssignment'
+      responses:
+        '200':
+          description: Badge added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HobbyBadgesResponse'
+
+  /badges/{userId}/hobby/{badgeName}:
+    delete:
+      tags: [Badges]
+      operationId: removeHobbyBadge
+      summary: Remove a hobby badge (admin only)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: badgeName
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Badge removed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HobbyBadgesResponse'
 
   /users/stats:
     get:
@@ -704,3 +865,40 @@ components:
           type: string
         objectPath:
           type: string
+
+    UserBadges:
+      type: object
+      properties:
+        mainBadge:
+          type: ["string", "null"]
+        proficiencyBadges:
+          type: array
+          items:
+            type: string
+        hobbyBadges:
+          type: array
+          items:
+            type: string
+
+    BadgeAssignment:
+      type: object
+      required: [badge]
+      properties:
+        badge:
+          type: string
+
+    ProficiencyBadgesResponse:
+      type: object
+      properties:
+        proficiencyBadges:
+          type: array
+          items:
+            type: string
+
+    HobbyBadgesResponse:
+      type: object
+      properties:
+        hobbyBadges:
+          type: array
+          items:
+            type: string

@@ -5,7 +5,18 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Send } from "lucide-react";
+import { Loader2, Send, Pencil, Trash2, X, Check, ArrowLeft } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 const getInitials = (first: string | null, last: string | null) => {
   return `${first?.[0] ?? ""}${last?.[0] ?? ""}`.toUpperCase() || "?";
@@ -22,6 +33,7 @@ interface Conversation {
 }
 
 interface Message {
+  _id?: string;
   id: string;
   senderId: string;
   receiverId: string;
@@ -30,6 +42,8 @@ interface Message {
   createdAt: string;
   senderName: string | null;
   senderImageUrl: string | null;
+  isEdited?: boolean;
+  isDeleted?: boolean;
 }
 
 export default function Chat() {
@@ -43,8 +57,15 @@ export default function Chat() {
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const editInputRef = useRef<HTMLInputElement>(null);
+  const isMobile = useIsMobile();
+  const [showConversations, setShowConversations] = useState(!urlUserId);
 
   const fetchConversations = useCallback(async () => {
     try {
@@ -97,6 +118,12 @@ export default function Chat() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  useEffect(() => {
+    if (editingId && editInputRef.current) {
+      editInputRef.current.focus();
+    }
+  }, [editingId]);
+
   const handleSend = async () => {
     if (!newMessage.trim() || !selectedUserId || sending) return;
     setSending(true);
@@ -123,6 +150,60 @@ export default function Chat() {
     }
   };
 
+  const startEdit = (msg: Message) => {
+    setEditingId(msg.id);
+    setEditContent(msg.content);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditContent("");
+  };
+
+  const saveEdit = async () => {
+    if (!editContent.trim() || !editingId || savingEdit) return;
+    setSavingEdit(true);
+    try {
+      const res = await fetch(`/api/chat/messages/${editingId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ content: editContent.trim() }),
+      });
+      if (res.ok) {
+        cancelEdit();
+        if (selectedUserId) fetchMessages(selectedUserId);
+        fetchConversations();
+      }
+    } catch {}
+    setSavingEdit(false);
+  };
+
+  const editKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      saveEdit();
+    }
+    if (e.key === "Escape") {
+      cancelEdit();
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      const res = await fetch(`/api/chat/messages/${deleteTarget}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (res.ok) {
+        if (selectedUserId) fetchMessages(selectedUserId);
+        fetchConversations();
+      }
+    } catch {}
+    setDeleteTarget(null);
+  };
+
   const selectedUser = conversations.find((c) => c.userId === selectedUserId);
 
   if (loading) {
@@ -135,7 +216,7 @@ export default function Chat() {
 
   return (
     <div className="flex h-[calc(100vh-12rem)] gap-4">
-      <div className="w-80 shrink-0 border rounded-lg bg-card overflow-hidden flex flex-col">
+      <div className={`w-80 shrink-0 border rounded-lg bg-card overflow-hidden flex flex-col ${isMobile && !showConversations ? "hidden" : ""} ${isMobile ? "w-full" : ""}`}>
         <div className="p-3 border-b font-semibold text-sm bg-muted/30">
           Conversations / المحادثات
         </div>
@@ -148,7 +229,10 @@ export default function Chat() {
             conversations.map((conv) => (
               <button
                 key={conv.userId}
-                onClick={() => setSelectedUserId(conv.userId)}
+                onClick={() => {
+                  setSelectedUserId(conv.userId);
+                  if (isMobile) setShowConversations(false);
+                }}
                 className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left border-b border-border/50 ${
                   selectedUserId === conv.userId ? "bg-muted/30" : ""
                 }`}
@@ -182,7 +266,7 @@ export default function Chat() {
         </div>
       </div>
 
-      <div className="flex-1 border rounded-lg bg-card overflow-hidden flex flex-col">
+      <div className={`flex-1 border rounded-lg bg-card overflow-hidden flex flex-col ${isMobile && showConversations ? "hidden" : ""}`}>
         {!selectedUserId ? (
           <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
             Select a conversation to start chatting
@@ -190,6 +274,11 @@ export default function Chat() {
         ) : (
           <>
             <div className="p-3 border-b bg-muted/30 flex items-center gap-3">
+              {isMobile && (
+                <Button variant="ghost" size="icon" onClick={() => setShowConversations(true)} className="shrink-0">
+                  <ArrowLeft className="h-5 w-5" />
+                </Button>
+              )}
               <Avatar className="h-8 w-8">
                 {selectedUser?.profileImageUrl && (
                   <AvatarImage src={selectedUser.profileImageUrl} alt={selectedUser?.firstName ?? ""} />
@@ -207,19 +296,68 @@ export default function Chat() {
               <div className="space-y-3">
                 {messages.map((msg) => {
                   const isMine = msg.senderId === user?.id;
+                  const isEditing = editingId === msg.id;
                   return (
-                    <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
-                      <div
-                        className={`max-w-[70%] px-4 py-2 rounded-2xl text-sm ${
-                          isMine
-                            ? "bg-primary text-primary-foreground rounded-br-md"
-                            : "bg-muted text-foreground rounded-bl-md"
-                        }`}
-                      >
-                        <p className="whitespace-pre-wrap break-words">{msg.content}</p>
-                        <p className={`text-[10px] mt-1 ${isMine ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
-                          {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-                        </p>
+                    <div key={msg.id} className={`flex ${isMine ? "justify-end" : "justify-start"} group`}>
+                      <div className={`max-w-[85%] sm:max-w-[70%] ${isMine ? "order-1" : "order-1"}`}>
+                        {isEditing ? (
+                          <div className="flex gap-2">
+                            <Input
+                              ref={editInputRef}
+                              value={editContent}
+                              onChange={(e) => setEditContent(e.target.value)}
+                              onKeyDown={editKeyDown}
+                              className="flex-1"
+                              disabled={savingEdit}
+                            />
+                            <Button size="icon" variant="ghost" onClick={saveEdit} disabled={savingEdit || !editContent.trim()}>
+                              {savingEdit ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                            </Button>
+                            <Button size="icon" variant="ghost" onClick={cancelEdit}>
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div
+                            className={`px-4 py-2 rounded-2xl text-sm ${
+                              isMine
+                                ? "bg-primary text-primary-foreground rounded-br-md"
+                                : "bg-muted text-foreground rounded-bl-md"
+                            }`}
+                          >
+                            {msg.isDeleted ? (
+                              <p className="italic opacity-60">Message deleted</p>
+                            ) : (
+                              <>
+                                <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                                {msg.isEdited && (
+                                  <span className={`text-[10px] italic ${isMine ? "text-primary-foreground/50" : "text-muted-foreground/50"}`}>
+                                    (edited)
+                                  </span>
+                                )}
+                              </>
+                            )}
+                            <p className={`text-[10px] mt-1 ${isMine ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
+                              {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                            </p>
+                          </div>
+                        )}
+                        {isMine && !msg.isDeleted && !isEditing && (
+                          <div className="flex justify-end gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => startEdit(msg)}
+                              className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </button>
+                            <button
+                              onClick={() => setDeleteTarget(msg.id)}
+                              className="h-6 w-6 flex items-center justify-center rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   );
@@ -244,6 +382,23 @@ export default function Chat() {
           </>
         )}
       </div>
+
+      <AlertDialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete message?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will replace the message with "Message deleted". This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

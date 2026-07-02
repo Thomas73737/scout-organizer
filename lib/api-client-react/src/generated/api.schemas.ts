@@ -47,6 +47,10 @@ export interface ScoutUser {
   profileImageUrl?: string | null;
   /** @nullable */
   patrol?: string | null;
+  /** @nullable */
+  mainBadge?: string | null;
+  proficiencyBadges?: string[];
+  hobbyBadges?: string[];
   role: ScoutUserRole;
   createdAt: string;
 }
