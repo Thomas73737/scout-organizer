@@ -5,7 +5,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Loader2, Send, Pencil, Trash2, X, Check, ArrowLeft } from "lucide-react";
+import { Loader2, Send, Pencil, Trash2, X, Check, ArrowLeft, Reply } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogContent,
@@ -44,6 +44,8 @@ interface Message {
   senderImageUrl: string | null;
   isEdited?: boolean;
   isDeleted?: boolean;
+  replyTo?: { content: string; senderName: string } | null;
+  replyToId?: string | null;
 }
 
 export default function Chat() {
@@ -61,6 +63,7 @@ export default function Chat() {
   const [editContent, setEditContent] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [replyToId, setReplyToId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
@@ -128,14 +131,17 @@ export default function Chat() {
     if (!newMessage.trim() || !selectedUserId || sending) return;
     setSending(true);
     try {
+      const body: Record<string, string> = { receiverId: selectedUserId, content: newMessage.trim() };
+      if (replyToId) body.replyToId = replyToId;
       const res = await fetch("/api/chat/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ receiverId: selectedUserId, content: newMessage.trim() }),
+        body: JSON.stringify(body),
       });
       if (res.ok) {
         setNewMessage("");
+        setReplyToId(null);
         fetchMessages(selectedUserId);
         fetchConversations();
       }
@@ -205,6 +211,8 @@ export default function Chat() {
   };
 
   const selectedUser = conversations.find((c) => c.userId === selectedUserId);
+  const repliedMessage = replyToId ? messages.find((m) => m.id === replyToId) : null;
+  const replyingToName = repliedMessage?.senderId === user?.id ? "You" : (repliedMessage?.senderName ?? "Unknown");
 
   if (loading) {
     return (
@@ -231,6 +239,7 @@ export default function Chat() {
                 key={conv.userId}
                 onClick={() => {
                   setSelectedUserId(conv.userId);
+                  setReplyToId(null);
                   if (isMobile) setShowConversations(false);
                 }}
                 className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors text-left border-b border-border/50 ${
@@ -329,6 +338,12 @@ export default function Chat() {
                               <p className="italic opacity-60">Message deleted</p>
                             ) : (
                               <>
+                                {msg.replyTo && (
+                                  <div className={`mb-1.5 pl-2 border-l-2 text-xs ${isMine ? "border-primary-foreground/30 text-primary-foreground/70" : "border-muted-foreground/30 text-muted-foreground/70"}`}>
+                                    <span className="font-medium">{msg.replyTo.senderName}</span>
+                                    <p className="truncate max-w-60">{msg.replyTo.content}</p>
+                                  </div>
+                                )}
                                 <p className="whitespace-pre-wrap break-words">{msg.content}</p>
                                 {msg.isEdited && (
                                   <span className={`text-[10px] italic ${isMine ? "text-primary-foreground/50" : "text-muted-foreground/50"}`}>
@@ -342,20 +357,31 @@ export default function Chat() {
                             </p>
                           </div>
                         )}
-                        {isMine && !msg.isDeleted && !isEditing && (
-                          <div className="flex justify-end gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {!msg.isDeleted && !isEditing && (
+                          <div className={`flex gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity ${isMine ? "justify-end" : "justify-start"}`}>
                             <button
-                              onClick={() => startEdit(msg)}
+                              onClick={() => setReplyToId(msg.id)}
                               className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                              title="Reply"
                             >
-                              <Pencil className="h-3 w-3" />
+                              <Reply className="h-3 w-3" />
                             </button>
-                            <button
-                              onClick={() => setDeleteTarget(msg.id)}
-                              className="h-6 w-6 flex items-center justify-center rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </button>
+                            {isMine && (
+                              <>
+                                <button
+                                  onClick={() => startEdit(msg)}
+                                  className="h-6 w-6 flex items-center justify-center rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                  <Pencil className="h-3 w-3" />
+                                </button>
+                                <button
+                                  onClick={() => setDeleteTarget(msg.id)}
+                                  className="h-6 w-6 flex items-center justify-center rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </button>
+                              </>
+                            )}
                           </div>
                         )}
                       </div>
@@ -366,6 +392,17 @@ export default function Chat() {
               </div>
             </ScrollArea>
 
+            {replyToId && repliedMessage && !repliedMessage.isDeleted && (
+              <div className="px-3 py-2 border-t flex items-center gap-2 bg-muted/20 text-xs text-muted-foreground">
+                <Reply className="h-3 w-3 shrink-0" />
+                <span className="truncate flex-1">
+                  Replying to <span className="font-medium">{replyingToName}</span>: {repliedMessage.content}
+                </span>
+                <button onClick={() => setReplyToId(null)} className="shrink-0 hover:text-foreground">
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            )}
             <div className="p-3 border-t flex gap-2">
               <Input
                 value={newMessage}

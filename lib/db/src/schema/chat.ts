@@ -8,6 +8,7 @@ const chatMessageSchema = new mongoose.Schema({
   isRead: { type: Boolean, default: false },
   isEdited: { type: Boolean, default: false },
   isDeleted: { type: Boolean, default: false },
+  replyToId: { type: String, default: null },
   createdAt: { type: Date, default: Date.now },
 });
 
@@ -25,6 +26,7 @@ export type ChatMessage = {
   isRead?: boolean;
   isEdited?: boolean;
   isDeleted?: boolean;
+  replyToId?: string | null;
   createdAt?: Date;
 };
 

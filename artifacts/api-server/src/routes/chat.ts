@@ -93,12 +93,25 @@ router.get("/chat/messages/:otherUserId", async (req, res) => {
   const users = await UserModel.find({ id: { $in: userIds } }).lean();
   const userMap = new Map(users.map((u) => [u.id, u]));
 
+  const replyToIds = messages.map((m) => m.replyToId).filter(Boolean) as string[];
+  let replyToMap = new Map<string, { content: string; senderName: string }>();
+  if (replyToIds.length > 0) {
+    const repliedMessages = await ChatMessageModel.find({ id: { $in: replyToIds } }).lean();
+    for (const rm of repliedMessages) {
+      const ru = userMap.get(rm.senderId);
+      const rn = ru ? `${ru.firstName ?? ""} ${ru.lastName ?? ""}`.trim() : "Unknown";
+      const rc = rm.isDeleted ? "Message deleted" : rm.content;
+      replyToMap.set(rm.id, { content: rc, senderName: rn });
+    }
+  }
+
   const enriched = messages.map((msg) => ({
     ...msg,
     senderName: userMap.get(msg.senderId) ? `${userMap.get(msg.senderId)!.firstName ?? ""} ${userMap.get(msg.senderId)!.lastName ?? ""}`.trim() : null,
     senderImageUrl: userMap.get(msg.senderId)?.profileImageUrl ?? null,
     isEdited: msg.isEdited ?? false,
     isDeleted: msg.isDeleted ?? false,
+    replyTo: msg.replyToId ? (replyToMap.get(msg.replyToId) ?? null) : null,
   }));
 
   await ChatMessageModel.updateMany(
@@ -116,7 +129,7 @@ router.post("/chat/send", async (req, res) => {
   }
   await ensureProfile(req.user.id);
 
-  const { receiverId, content } = req.body as { receiverId?: string; content?: string };
+  const { receiverId, content, replyToId } = req.body as { receiverId?: string; content?: string; replyToId?: string };
   if (!receiverId || !content) {
     res.status(400).json({ error: "receiverId and content are required" });
     return;
@@ -134,6 +147,7 @@ router.post("/chat/send", async (req, res) => {
     receiverId,
     content,
     isRead: false,
+    ...(replyToId ? { replyToId } : {}),
   });
 
   const sender = await UserModel.findOne({ id: req.user.id }).lean();

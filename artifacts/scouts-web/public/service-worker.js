@@ -3,8 +3,8 @@ self.addEventListener('push', (event) => {
 
   const options = {
     body: data.message,
-    icon: data.icon || '/favicon.svg',
-    badge: '/favicon.svg',
+    icon: data.icon || '/favicon.png',
+    badge: '/favicon.png',
     data: data.data || {},
     vibrate: [200, 100, 200],
   };

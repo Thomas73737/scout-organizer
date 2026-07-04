@@ -123,7 +123,12 @@ export function usePushNotifications(userId: string | null) {
         }
       }
 
-      const registration = await navigator.serviceWorker.ready;
+      let registration = await navigator.serviceWorker.getRegistration();
+      if (!registration) {
+        registration = await navigator.serviceWorker.register(SW_PATH);
+      }
+      await navigator.serviceWorker.ready;
+
       const existingSub = await registration.pushManager.getSubscription();
       if (existingSub) {
         await existingSub.unsubscribe();
@@ -154,6 +159,8 @@ export function usePushNotifications(userId: string | null) {
         console.log(`Subscribed to push notifications. Devices: ${data.deviceCount}`);
         return true;
       }
+      console.error('Failed to subscribe:', data.error || 'Unknown error');
+      alert(data.error || 'Failed to subscribe to push notifications.');
       return false;
     } catch (error) {
       console.error('Failed to subscribe:', error);
@@ -164,7 +171,11 @@ export function usePushNotifications(userId: string | null) {
 
   const unsubscribe = async (): Promise<void> => {
     try {
-      const registration = await navigator.serviceWorker.ready;
+      let registration = await navigator.serviceWorker.getRegistration();
+      if (!registration) {
+        registration = await navigator.serviceWorker.register(SW_PATH);
+      }
+      await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
       if (subscription) {
         const endpoint = subscription.endpoint;
