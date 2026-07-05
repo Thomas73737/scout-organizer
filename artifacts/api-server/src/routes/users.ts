@@ -48,7 +48,7 @@ async function getUserWithRole(userId: string) {
 
 async function isDeveloperOrLeader(userId: string): Promise<boolean> {
   const profile = await ScoutProfileModel.findOne({ userId });
-  return profile?.role === "developer" || profile?.role === "leader";
+  return profile?.role === "developer" || profile?.role === "leader" || profile?.role === "cp_of_cps";
 }
 
 async function isDeveloper(userId: string): Promise<boolean> {
@@ -312,14 +312,18 @@ router.get("/users/stats", async (req, res) => {
   }
 
   const scoutCount = await ScoutProfileModel.countDocuments({ role: "scout" });
+  const cpCount = await ScoutProfileModel.countDocuments({ role: "cp" });
+  const cpOfCpsCount = await ScoutProfileModel.countDocuments({ role: "cp_of_cps" });
   const leaderCount = await ScoutProfileModel.countDocuments({ role: "leader" });
   const developerCount = await ScoutProfileModel.countDocuments({ role: "developer" });
 
   res.json({
     totalScouts: scoutCount,
+    totalCp: cpCount,
+    totalCpOfCps: cpOfCpsCount,
     totalLeaders: leaderCount,
     totalDevelopers: developerCount,
-    totalMembers: scoutCount + leaderCount + developerCount,
+    totalMembers: scoutCount + cpCount + cpOfCpsCount + leaderCount + developerCount,
   });
 });
 
@@ -501,7 +505,7 @@ router.post("/users/login", async (req, res) => {
     res.json({
       message: "Login successful",
       user: profile,
-      isAdmin: profile.role === "leader"
+      isAdmin: profile.role === "leader" || profile.role === "developer" || profile.role === "cp_of_cps"
     });
   } catch (err: any) {
     console.error("Login failed:", err?.message ?? err);
@@ -666,8 +670,8 @@ router.post("/users/change-role", async (req, res) => {
     return;
   }
 
-  if (!["scout", "leader", "developer"].includes(newRole)) {
-    res.status(400).json({ error: "Invalid role. Must be scout, leader, or developer" });
+  if (!["scout", "cp", "leader", "developer"].includes(newRole)) {
+    res.status(400).json({ error: "Invalid role. Must be scout, cp, leader, or developer" });
     return;
   }
 

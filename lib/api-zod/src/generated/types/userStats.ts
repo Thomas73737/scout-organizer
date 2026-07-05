@@ -8,6 +8,9 @@
 
 export interface UserStats {
   totalScouts: number;
+  totalCp: number;
+  totalCpOfCps: number;
   totalLeaders: number;
+  totalDevelopers: number;
   totalMembers: number;
 }

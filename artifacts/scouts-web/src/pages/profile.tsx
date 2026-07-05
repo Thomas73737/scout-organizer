@@ -202,10 +202,10 @@ export default function Profile() {
                 <div className="flex items-center gap-2">
                   <Badge
                     className="capitalize"
-                    variant={profile?.role === "leader" || profile?.role === "developer" ? "default" : "secondary"}
+                    variant={profile?.role === "leader" || profile?.role === "developer" || profile?.role === "cp_of_cps" || profile?.role === "cp" ? "default" : "secondary"}
                     data-testid="text-profile-role"
                   >
-                    {profile?.role === "leader" ? "Leader / قائد" : profile?.role === "developer" ? "Developer / مطور" : "Scout / كشاف"}
+                    {profile?.role === "leader" ? "Leader / قائد" : profile?.role === "developer" ? "Developer / مطور" : profile?.role === "cp_of_cps" ? "CP of CPs / قائد كوربال" : profile?.role === "cp" ? "CP / كوربال" : "Scout / كشاف"}
                   </Badge>
                 </div>
               </div>

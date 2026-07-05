@@ -226,7 +226,7 @@ function AttendanceSessionDetail({ sessionId, onClose }: { sessionId: string; on
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: profile } = useGetMyProfile();
-  const isLeader = profile?.role === "leader" || profile?.role === "developer";
+  const isLeader = profile?.role === "leader" || profile?.role === "developer" || profile?.role === "cp_of_cps";
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
   const [attendance, setAttendance] = useState<SessionAttendanceState>({});
@@ -445,8 +445,8 @@ export default function Attendance() {
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const [confirmDeleteSessionId, setConfirmDeleteSessionId] = useState<string | null>(null);
 
-  const isLeader = profile?.role === "leader" || profile?.role === "developer";
-  const isAdmin = profile?.role === "leader" || profile?.role === "developer";
+  const isLeader = profile?.role === "leader" || profile?.role === "developer" || profile?.role === "cp_of_cps";
+  const isAdmin = profile?.role === "leader" || profile?.role === "developer" || profile?.role === "cp_of_cps";
 
   const patrols = ["صقر", "فهد", "ثعلب", "ذئب", "نمر", "نسر", "أسد", "غراب", "بلبل", "ديك", "خفاش", "غزال"];
 

@@ -25,6 +25,10 @@ const roleBadge = (role: string) => {
       return <Badge className="text-[10px] px-1.5 py-0 h-4 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 border-0">Leader</Badge>;
     case "developer":
       return <Badge className="text-[10px] px-1.5 py-0 h-4 bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 border-0">Dev</Badge>;
+    case "cp_of_cps":
+      return <Badge className="text-[10px] px-1.5 py-0 h-4 bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border-0">CP of CPs</Badge>;
+    case "cp":
+      return <Badge className="text-[10px] px-1.5 py-0 h-4 bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 border-0">CP</Badge>;
     default:
       return <Badge className="text-[10px] px-1.5 py-0 h-4 bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border-0">Scout</Badge>;
   }
@@ -67,7 +71,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [showUserMenu, setShowUserMenu] = React.useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
-  const isLeader = profile?.role === "leader" || profile?.role === "developer";
+  const isLeader = profile?.role === "leader" || profile?.role === "developer" || profile?.role === "cp_of_cps";
   const { theme, setTheme } = useTheme();
 
   React.useEffect(() => {
@@ -134,7 +138,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   const sortedUsers = React.useMemo(() => {
     if (!allUsers) return [];
-    const roleOrder: Record<string, number> = { developer: 0, leader: 1, scout: 2 };
+    const roleOrder: Record<string, number> = { developer: 0, leader: 1, cp_of_cps: 2, cp: 3, scout: 4 };
     return [...allUsers].sort((a, b) => (roleOrder[a.role] ?? 9) - (roleOrder[b.role] ?? 9));
   }, [allUsers]);
 

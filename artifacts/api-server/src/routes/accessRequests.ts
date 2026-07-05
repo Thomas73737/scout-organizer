@@ -12,7 +12,7 @@ const router = Router();
 
 async function ensureLeaderOrDeveloper(userId: string) {
   const profile = await ScoutProfileModel.findOne({ userId });
-  return profile && (profile.role === "leader" || profile.role === "developer");
+  return profile && (profile.role === "leader" || profile.role === "developer" || profile.role === "cp_of_cps");
 }
 
 router.post("/access-requests", async (req, res) => {

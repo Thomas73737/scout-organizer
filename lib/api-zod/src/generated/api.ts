@@ -76,7 +76,7 @@ export const ListUsersResponseItem = zod.object({
   "lastName": zod.string().nullable(),
   "email": zod.string().nullable(),
   "profileImageUrl": zod.string().nullish(),
-  "role": zod.enum(['scout', 'leader', 'developer']),
+  "role": zod.enum(['scout', 'cp', 'cp_of_cps', 'leader', 'developer']),
   "createdAt": zod.coerce.date()
 })
 export const ListUsersResponse = zod.array(ListUsersResponseItem)
@@ -92,7 +92,7 @@ export const GetMyProfileResponse = zod.object({
   "lastName": zod.string().nullable(),
   "email": zod.string().nullable(),
   "profileImageUrl": zod.string().nullish(),
-  "role": zod.enum(['scout', 'leader', 'developer']),
+  "role": zod.enum(['scout', 'cp', 'cp_of_cps', 'leader', 'developer']),
   "createdAt": zod.coerce.date()
 })
 
@@ -105,7 +105,7 @@ export const UpdateUserRoleParams = zod.object({
 })
 
 export const UpdateUserRoleBody = zod.object({
-  "role": zod.enum(['scout', 'leader', 'developer'])
+  "role": zod.enum(['scout', 'cp', 'cp_of_cps', 'leader', 'developer'])
 })
 
 export const UpdateUserRoleResponse = zod.object({
@@ -115,7 +115,7 @@ export const UpdateUserRoleResponse = zod.object({
   "lastName": zod.string().nullable(),
   "email": zod.string().nullable(),
   "profileImageUrl": zod.string().nullish(),
-  "role": zod.enum(['scout', 'leader', 'developer']),
+  "role": zod.enum(['scout', 'cp', 'cp_of_cps', 'leader', 'developer']),
   "createdAt": zod.coerce.date()
 })
 
@@ -125,7 +125,10 @@ export const UpdateUserRoleResponse = zod.object({
  */
 export const GetUserStatsResponse = zod.object({
   "totalScouts": zod.number(),
+  "totalCp": zod.number(),
+  "totalCpOfCps": zod.number(),
   "totalLeaders": zod.number(),
+  "totalDevelopers": zod.number(),
   "totalMembers": zod.number()
 })
 

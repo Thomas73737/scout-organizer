@@ -12,7 +12,7 @@ async function getProfile(userId: string) {
 
 async function isDeveloperOrLeader(userId: string): Promise<boolean> {
   const profile = await ScoutProfileModel.findOne({ userId });
-  return profile?.role === "developer" || profile?.role === "leader";
+  return profile?.role === "developer" || profile?.role === "leader" || profile?.role === "cp_of_cps";
 }
 
 async function ensureProfile(userId: string) {

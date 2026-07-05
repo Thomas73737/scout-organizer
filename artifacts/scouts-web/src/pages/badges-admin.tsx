@@ -55,7 +55,7 @@ export default function BadgesAdmin() {
   const [addSearch, setAddSearch] = useState("");
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
-  const scouts = useMemo(() => (users || []).filter((u) => u.role === "scout"), [users]);
+  const scouts = useMemo(() => (users || []).filter((u) => u.role === "scout" || u.role === "cp" || u.role === "cp_of_cps"), [users]);
 
   const badges = getBadgesForCategory(category);
 

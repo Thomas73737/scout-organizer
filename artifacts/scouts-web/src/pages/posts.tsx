@@ -124,7 +124,7 @@ export default function Posts() {
   };
 
   const canDelete = (post: any) => {
-    if (profile?.role === "leader" || profile?.role === "developer") return true;
+    if (profile?.role === "leader" || profile?.role === "developer" || profile?.role === "cp_of_cps") return true;
     return post.authorId === profile?.id;
   };
 

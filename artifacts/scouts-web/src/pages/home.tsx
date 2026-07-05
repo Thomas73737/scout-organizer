@@ -24,7 +24,7 @@ export default function Home() {
         ) : (
           <>
             <p className="text-primary-foreground/70 text-sm mb-1">
-              {profile?.role === "leader" ? "قائد / Leader" : profile?.role === "developer" ? "مطور / Developer" : "كشاف / Scout"}
+              {profile?.role === "leader" ? "قائد / Leader" : profile?.role === "developer" ? "مطور / Developer" : profile?.role === "cp_of_cps" ? "قائد كوربال / CP of CPs" : profile?.role === "cp" ? "CP / كوربال" : "كشاف / Scout"}
             </p>
             <h2 className="text-2xl font-serif font-bold mb-1">
               أهلاً، {profile?.firstName ?? "أهلاً"} 
@@ -37,7 +37,7 @@ export default function Home() {
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
         <Card className="col-span-2 md:col-span-1" data-testid="stat-members">
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
@@ -48,7 +48,7 @@ export default function Home() {
                 {statsLoading ? (
                   <Skeleton className="h-6 w-12" />
                 ) : (
-                  <p className="text-2xl font-bold text-foreground">{(stats?.totalScouts ?? 0) + (stats?.totalLeaders ?? 0) + (stats?.totalDevelopers ?? 0)}</p>
+                  <p className="text-2xl font-bold text-foreground">{(stats?.totalScouts ?? 0) + (stats?.totalCp ?? 0) + (stats?.totalCpOfCps ?? 0) + (stats?.totalLeaders ?? 0) + (stats?.totalDevelopers ?? 0)}</p>
                 )}
                 <p className="text-xs text-muted-foreground">Members / أعضاء</p>
               </div>
@@ -69,6 +69,42 @@ export default function Home() {
                   <p className="text-2xl font-bold text-foreground">{stats?.totalScouts ?? 0}</p>
                 )}
                 <p className="text-xs text-muted-foreground">Scouts / كشافة</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="col-span-2 md:col-span-1" data-testid="stat-cp">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-teal-500/10 rounded-lg">
+                <Users className="h-5 w-5 text-teal-500" />
+              </div>
+              <div>
+                {statsLoading ? (
+                  <Skeleton className="h-6 w-12" />
+                ) : (
+                  <p className="text-2xl font-bold text-foreground">{stats?.totalCp ?? 0}</p>
+                )}
+                <p className="text-xs text-muted-foreground">CP / كوربال</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="col-span-2 md:col-span-1" data-testid="stat-cp-of-cps">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-orange-500/10 rounded-lg">
+                <Users className="h-5 w-5 text-orange-500" />
+              </div>
+              <div>
+                {statsLoading ? (
+                  <Skeleton className="h-6 w-12" />
+                ) : (
+                  <p className="text-2xl font-bold text-foreground">{stats?.totalCpOfCps ?? 0}</p>
+                )}
+                <p className="text-xs text-muted-foreground">CP of CPs / قائد كوربال</p>
               </div>
             </div>
           </CardContent>

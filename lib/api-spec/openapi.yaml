@@ -625,7 +625,7 @@ components:
           type: ["string", "null"]
         role:
           type: string
-          enum: [scout, leader, developer]
+          enum: [scout, cp, cp_of_cps, leader, developer]
         createdAt:
           type: string
           format: date-time
@@ -636,13 +636,17 @@ components:
       properties:
         role:
           type: string
-          enum: [scout, leader, developer]
+          enum: [scout, cp, cp_of_cps, leader, developer]
 
     UserStats:
       type: object
-      required: [totalScouts, totalLeaders, totalDevelopers, totalMembers]
+      required: [totalScouts, totalCp, totalCpOfCps, totalLeaders, totalDevelopers, totalMembers]
       properties:
         totalScouts:
+          type: integer
+        totalCp:
+          type: integer
+        totalCpOfCps:
           type: integer
         totalLeaders:
           type: integer

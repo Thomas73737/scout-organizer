@@ -39,7 +39,7 @@ function ProtectedRoute({ component: Component, adminOnly = false }: { component
     return <Redirect to="/login" />;
   }
 
-  if (adminOnly && profile?.role !== "leader" && profile?.role !== "developer") {
+  if (adminOnly && profile?.role !== "leader" && profile?.role !== "developer" && profile?.role !== "cp_of_cps") {
     return <Redirect to="/dashboard" />;
   }
 

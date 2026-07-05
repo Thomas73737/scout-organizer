@@ -36,7 +36,7 @@ export default function CalendarPage() {
   const [sendAnnouncement, setSendAnnouncement] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const isLeader = profile?.role === "leader" || profile?.role === "developer";
+  const isLeader = profile?.role === "leader" || profile?.role === "developer" || profile?.role === "cp_of_cps";
 
   const fetchEvents = async () => {
     try {

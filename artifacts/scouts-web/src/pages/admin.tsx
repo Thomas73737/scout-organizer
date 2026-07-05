@@ -218,7 +218,7 @@ export default function Admin() {
     }
   };
 
-  const handleRoleChange = (userId: string, role: "scout" | "leader" | "developer") => {
+  const handleRoleChange = (userId: string, role: "scout" | "cp" | "cp_of_cps" | "leader" | "developer") => {
     updateRoleMutation.mutate(
       { userId, data: { role } },
       {
@@ -277,10 +277,12 @@ export default function Admin() {
   };
 
   const scouts = users?.filter((u) => u.role === "scout") ?? [];
+  const cpUsers = users?.filter((u) => u.role === "cp") ?? [];
+  const cpOfCpsUsers = users?.filter((u) => u.role === "cp_of_cps") ?? [];
   const leaders = users?.filter((u) => u.role === "leader") ?? [];
   const developers = users?.filter((u) => u.role === "developer") ?? [];
   const patrols = ["صقر", "فهد", "ثعلب", "ذئب", "نمر", "نسر", "أسد", "غراب", "بلبل", "ديك", "خفاش", "غزال"];
-  const isDeveloper = currentUser?.role === "developer" || currentUser?.role === "leader";
+  const isDeveloper = currentUser?.role === "developer" || currentUser?.role === "leader" || currentUser?.role === "cp_of_cps";
 
   const handleExportData = async () => {
     try {
@@ -313,7 +315,7 @@ export default function Admin() {
         <p className="text-muted-foreground text-sm mt-1">Manage member roles and permissions</p>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-5 flex items-center gap-3">
             <Users className="h-5 w-5 text-secondary" />
@@ -329,6 +331,24 @@ export default function Admin() {
             <div>
               <p className="text-2xl font-bold">{leaders.length}</p>
               <p className="text-xs text-muted-foreground">Leaders / قادة</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-5 flex items-center gap-3">
+            <Shield className="h-5 w-5 text-teal-500" />
+            <div>
+              <p className="text-2xl font-bold">{cpUsers.length}</p>
+              <p className="text-xs text-muted-foreground">CP / كوربال</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-5 flex items-center gap-3">
+            <Shield className="h-5 w-5 text-orange-500" />
+            <div>
+              <p className="text-2xl font-bold">{cpOfCpsUsers.length}</p>
+              <p className="text-xs text-muted-foreground">CP of CPs / قائد كوربال</p>
             </div>
           </CardContent>
         </Card>
@@ -603,7 +623,7 @@ export default function Admin() {
                   <div className="flex flex-wrap gap-1.5">
                     <Select
                       value={user.role}
-                      onValueChange={(val) => handleRoleChange(user.replitId, val as "scout" | "leader" | "developer")}
+                       onValueChange={(val) => handleRoleChange(user.replitId, val as "scout" | "cp" | "cp_of_cps" | "leader" | "developer")}
                       disabled={updateRoleMutation.isPending}
                     >
                       <SelectTrigger className="w-28 sm:w-32 h-8 text-xs" data-testid={`select-role-${user.id}`}>
@@ -611,6 +631,8 @@ export default function Admin() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="scout">Scout / كشاف</SelectItem>
+                        <SelectItem value="cp">CP / كوربال</SelectItem>
+                        <SelectItem value="cp_of_cps">CP of CPs / قائد كوربال</SelectItem>
                         <SelectItem value="leader">Leader / قائد</SelectItem>
                         <SelectItem value="developer">Developer / مطور</SelectItem>
                       </SelectContent>
