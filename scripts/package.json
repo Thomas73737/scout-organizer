@@ -8,6 +8,8 @@
     "promote-to-leader": "node ./src/promote-to-leader.mjs \"$@\"",
     "create-admin": "node ./src/create-admin.mjs",
     "fix-email-index": "node ./fix-email-index.mjs",
+    "export-data": "node ./export-data.mjs",
+    "import-data": "node ./import-data.mjs",
     "cleanup-database": "tsx ./cleanup-database.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
