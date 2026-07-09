@@ -469,8 +469,8 @@ async function signObjectURL({
     method,
     expires_at: new Date(Date.now() + ttlSec * 1000).toISOString(),
   };
-  const response = await fetch(
-    `${REPLIT_SIDECAR_ENDPOINT}/object-storage/signed-object-url`,
+    const response: any = await fetch(
+    `${this.baseUrl}/api${GCS_SIGNING_PATH}`,
     {
       method: "POST",
       headers: {
