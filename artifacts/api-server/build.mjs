@@ -126,13 +126,18 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
   await rm(handlerOut, { force: true });
 
   await esbuild({
-    entryPoints: [path.resolve(rootDir, "api/handler.ts")],
+    entryPoints: [path.resolve(artifactDir, "src/handler.ts")],
     platform: "node",
     bundle: true,
     format: "esm",
     outfile: handlerOut,
     logLevel: "info",
-    external: ["*.node", "@google-cloud/*", "@google/*", "googleapis"],
+    external: [
+      "*.node",
+      "@google-cloud/*",
+      "@google/*",
+      "googleapis",
+    ],
     sourcemap: false,
     banner: {
       js: `import { createRequire as __bannerCrReq } from 'node:module';
