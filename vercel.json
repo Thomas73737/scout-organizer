@@ -13,9 +13,10 @@
     }
   ],
   "functions": {
-    "api/index.js": {
+    "api/index.mjs": {
       "memory": 512,
-      "maxDuration": 30
+      "maxDuration": 30,
+      "includeFiles": "artifacts/api-server/dist/**"
     }
   }
 }
