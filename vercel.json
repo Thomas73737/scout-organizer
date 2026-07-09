@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "pnpm install --no-frozen-lockfile",
   "buildCommand": "pnpm --filter @workspace/api-server run build && pnpm --filter @workspace/scouts-web run build",
-  "outputDirectory": "public",
+  "outputDirectory": "artifacts/scouts-web/dist",
   "rewrites": [
     {
       "source": "/api/(.*)",
