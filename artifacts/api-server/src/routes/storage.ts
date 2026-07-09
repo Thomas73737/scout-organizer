@@ -132,8 +132,6 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Expres
   }
 });
 
-router.get("/storage/objects/*path", async (req: Request, res: ExpressResponse) => {
-
 /**
  * GET /storage/objects/*
  *
