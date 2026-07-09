@@ -120,36 +120,6 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     `,
     },
   });
-
-  const rootDir = path.resolve(artifactDir, "../..");
-  const handlerOut = path.resolve(rootDir, "api/index.mjs");
-  await rm(handlerOut, { force: true });
-
-  await esbuild({
-    entryPoints: [path.resolve(artifactDir, "src/handler.ts")],
-    platform: "node",
-    bundle: true,
-    format: "esm",
-    outfile: handlerOut,
-    logLevel: "info",
-    external: [
-      "*.node",
-      "@google-cloud/*",
-      "@google/*",
-      "googleapis",
-    ],
-    sourcemap: false,
-    banner: {
-      js: `import { createRequire as __bannerCrReq } from 'node:module';
-import __bannerPath from 'node:path';
-import __bannerUrl from 'node:url';
-
-globalThis.require = __bannerCrReq(import.meta.url);
-globalThis.__filename = __bannerUrl.fileURLToPath(import.meta.url);
-globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
-    `,
-    },
-  });
 }
 
 buildAll().catch((err) => {
