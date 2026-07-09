@@ -136,7 +136,7 @@ export class ObjectStorageService {
     return null;
   }
 
-  async downloadObject(file: File, cacheTtlSec: number = 3600): Promise<globalThis.Response> {
+  async downloadObject(file: File, cacheTtlSec: number = 3600): Promise<Response> {
     if (IS_LOCAL_DEV && this.isMockFile(file)) {
       // Handle local file download
       const filePath = (file as any).localPath;
