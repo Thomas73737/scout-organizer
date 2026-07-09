@@ -26,6 +26,7 @@ const MAGIC_BYTES_MAP: Array<{ bytes: number[]; offset: number; mime: string }> 
 ];
 
 const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
+const GCS_SIGNING_PATH = "/gcs/sign-url";
 const IS_LOCAL_DEV = !process.env.REPLIT_DEPLOYMENT;
 
 // Local storage directory for development
@@ -470,7 +471,7 @@ async function signObjectURL({
     expires_at: new Date(Date.now() + ttlSec * 1000).toISOString(),
   };
     const response: any = await fetch(
-    `${this.baseUrl}/api${GCS_SIGNING_PATH}`,
+    `${REPLIT_SIDECAR_ENDPOINT}/api${GCS_SIGNING_PATH}`,
     {
       method: "POST",
       headers: {
