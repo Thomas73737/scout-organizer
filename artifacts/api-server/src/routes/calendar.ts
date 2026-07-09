@@ -1,19 +1,27 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
-import { CalendarEventModel, UserModel, ScoutProfileModel, AnnouncementModel, NotificationModel, PushSubscriptionModel } from "@workspace/db";
+import { supabase } from "@workspace/db";
 import { sendPushNotificationToMany } from "../lib/pushNotification";
 
 const router = Router();
 
 async function isDeveloperOrLeader(userId: string): Promise<boolean> {
-  const profile = await ScoutProfileModel.findOne({ userId });
-  return profile?.role === "developer" || profile?.role === "leader" || profile?.role === "cp_of_cps";
+  const { data } = await supabase
+    .from("scout_profiles")
+    .select("role")
+    .eq("userId", userId)
+    .single();
+  return data?.role === "developer" || data?.role === "leader" || data?.role === "cp_of_cps";
 }
 
 async function ensureProfile(userId: string) {
-  const existing = await ScoutProfileModel.findOne({ userId });
+  const { data: existing } = await supabase
+    .from("scout_profiles")
+    .select("id")
+    .eq("userId", userId)
+    .single();
   if (!existing) {
-    await ScoutProfileModel.create({ id: randomUUID(), userId, role: "scout" });
+    await supabase.from("scout_profiles").insert({ id: randomUUID(), userId, role: "scout" });
   }
 }
 
@@ -35,56 +43,66 @@ async function createAnnouncementForEvent(
     .filter(Boolean)
     .join("\n");
 
-  const announcement = await AnnouncementModel.create({
-    id: randomUUID(),
+  const announcementId = randomUUID();
+  await supabase.from("announcements").insert({
+    id: announcementId,
     title: `📢 ${eventTitle}`,
     content,
     authorUserId,
   });
 
-  const author = await UserModel.findOne({ id: authorUserId }).lean();
+  const { data: author } = await supabase
+    .from("users")
+    .select("firstName, lastName")
+    .eq("id", authorUserId)
+    .single();
   const authorName = author ? `${author.firstName ?? ""} ${author.lastName ?? ""}`.trim() : "Someone";
 
   try {
-    const allUsers = await UserModel.find({ id: { $ne: authorUserId } }).lean();
-    const notifications = allUsers.map((user) => ({
-      id: randomUUID(),
-      userId: user.id,
-      type: "announcement" as const,
-      title: "New Calendar Event",
-      message: eventTitle,
-      relatedId: announcement.id,
-      authorName,
-      isRead: false,
-    }));
-    if (notifications.length > 0) {
-      await NotificationModel.insertMany(notifications);
-    }
+    const { data: allUsers } = await supabase
+      .from("users")
+      .select("id")
+      .neq("id", authorUserId);
 
-    try {
-      const subscriptions = await PushSubscriptionModel.find({
-        userId: { $in: allUsers.map((u) => u.id) },
-      }).lean();
+    if (allUsers && allUsers.length > 0) {
+      const notifications = allUsers.map((user) => ({
+        id: randomUUID(),
+        userId: user.id,
+        type: "announcement" as const,
+        title: "New Calendar Event",
+        message: eventTitle,
+        relatedId: announcementId,
+        authorName,
+        isRead: false,
+      }));
+      await supabase.from("notifications").insert(notifications);
 
-      if (subscriptions.length > 0) {
-        const pushData = subscriptions.map((sub) => ({
-          endpoint: sub.endpoint,
-          keys: { p256dh: sub.keys!.p256dh, auth: sub.keys!.auth },
-        }));
+      try {
+        const { data: subscriptions } = await supabase
+          .from("push_subscriptions")
+          .select("endpoint, keyP256dh, keyAuth")
+          .in("userId", allUsers.map((u) => u.id));
 
-        await sendPushNotificationToMany(
-          pushData,
-          "New Calendar Event",
-          `${authorName} added: ${eventTitle}`,
-          {
-            type: "announcement",
-            announcementId: announcement.id,
-            url: "/calendar",
-          },
-        );
+        if (subscriptions && subscriptions.length > 0) {
+          const pushData = subscriptions.map((sub) => ({
+            endpoint: sub.endpoint,
+            keys: { p256dh: sub.keyP256dh, auth: sub.keyAuth },
+          }));
+
+          await sendPushNotificationToMany(
+            pushData,
+            "New Calendar Event",
+            `${authorName} added: ${eventTitle}`,
+            {
+              type: "announcement",
+              announcementId,
+              url: "/calendar",
+            },
+          );
+        }
+      } catch (pushError) {
+        console.error("Failed to send push for calendar event:", pushError);
       }
-    } catch (pushError) {
-      console.error("Failed to send push for calendar event:", pushError);
     }
   } catch (err) {
     console.error("Failed to create notifications for calendar event:", err);
@@ -97,11 +115,12 @@ router.get("/calendar", async (req, res) => {
     return;
   }
 
-  const events = await CalendarEventModel.find()
-    .sort({ date: 1 })
-    .lean();
+  const { data: events } = await supabase
+    .from("calendar_events")
+    .select("*")
+    .order("date", { ascending: true });
 
-  res.json(events);
+  res.json(events || []);
 });
 
 router.post("/calendar", async (req, res) => {
@@ -130,7 +149,7 @@ router.post("/calendar", async (req, res) => {
     return;
   }
 
-  const event = await CalendarEventModel.create({
+  const eventData = {
     id: randomUUID(),
     title,
     date,
@@ -138,13 +157,16 @@ router.post("/calendar", async (req, res) => {
     place: place || "",
     notes: notes || "",
     createdByUserId: req.user.id,
-  });
+    createdAt: new Date().toISOString(),
+  };
+
+  await supabase.from("calendar_events").insert(eventData);
 
   if (sendAnnouncement) {
     await createAnnouncementForEvent(title, notes || "", date, time || "", place || "", req.user.id);
   }
 
-  res.status(201).json(event.toObject());
+  res.status(201).json(eventData);
 });
 
 router.patch("/calendar/:eventId", async (req, res) => {
@@ -175,11 +197,12 @@ router.patch("/calendar/:eventId", async (req, res) => {
   if (place !== undefined) update.place = place;
   if (notes !== undefined) update.notes = notes;
 
-  const event = await CalendarEventModel.findOneAndUpdate(
-    { id: eventId },
-    update,
-    { new: true },
-  ).lean();
+  const { data: event } = await supabase
+    .from("calendar_events")
+    .update(update)
+    .eq("id", eventId)
+    .select()
+    .single();
 
   if (!event) {
     res.status(404).json({ error: "Event not found" });
@@ -202,7 +225,7 @@ router.delete("/calendar/:eventId", async (req, res) => {
   }
 
   const { eventId } = req.params;
-  await CalendarEventModel.deleteOne({ id: eventId });
+  await supabase.from("calendar_events").delete().eq("id", eventId);
   res.json({ success: true });
 });
 

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { randomUUID } from "crypto";
-import { PushSubscriptionModel } from "@workspace/db";
+import { supabase } from "@workspace/db";
 import { getVapidPublicKey } from "../lib/pushNotification";
 
 const router = Router();
@@ -28,25 +28,32 @@ router.post("/push/subscribe", async (req, res) => {
   }
 
   try {
-    const existing = await PushSubscriptionModel.findOne({
-      userId: req.user.id,
-      endpoint: parsed.data.endpoint,
-    });
+    const { data: existing } = await supabase
+      .from("push_subscriptions")
+      .select("id")
+      .eq("userId", req.user.id)
+      .eq("endpoint", parsed.data.endpoint)
+      .maybeSingle();
 
     if (existing) {
       res.json({ success: true, subscribed: true });
       return;
     }
 
-    await PushSubscriptionModel.create({
+    await supabase.from("push_subscriptions").insert({
       id: randomUUID(),
       userId: req.user.id,
       endpoint: parsed.data.endpoint,
-      keys: parsed.data.keys,
+      keyP256dh: parsed.data.keys.p256dh,
+      keyAuth: parsed.data.keys.auth,
       userAgent: parsed.data.userAgent,
     });
 
-    const count = await PushSubscriptionModel.countDocuments({ userId: req.user.id });
+    const { count } = await supabase
+      .from("push_subscriptions")
+      .select("id", { count: "exact", head: true })
+      .eq("userId", req.user.id);
+
     console.log(`Push subscription saved for user ${req.user.id}. Total devices: ${count}`);
     res.json({ success: true, subscribed: true, deviceCount: count });
   } catch (error) {
@@ -65,12 +72,23 @@ router.delete("/push/unsubscribe", async (req, res) => {
 
   try {
     if (endpoint) {
-      await PushSubscriptionModel.deleteOne({ userId: req.user.id, endpoint });
+      await supabase
+        .from("push_subscriptions")
+        .delete()
+        .eq("userId", req.user.id)
+        .eq("endpoint", endpoint);
     } else {
-      await PushSubscriptionModel.deleteMany({ userId: req.user.id });
+      await supabase
+        .from("push_subscriptions")
+        .delete()
+        .eq("userId", req.user.id);
     }
 
-    const count = await PushSubscriptionModel.countDocuments({ userId: req.user.id });
+    const { count } = await supabase
+      .from("push_subscriptions")
+      .select("id", { count: "exact", head: true })
+      .eq("userId", req.user.id);
+
     console.log(`Push subscription removed for user ${req.user.id}. Remaining devices: ${count}`);
     res.json({ success: true, deviceCount: count });
   } catch (error) {
@@ -86,8 +104,12 @@ router.get("/push/status", async (req, res) => {
   }
 
   try {
-    const count = await PushSubscriptionModel.countDocuments({ userId: req.user.id });
-    res.json({ subscribed: count > 0, deviceCount: count });
+    const { count } = await supabase
+      .from("push_subscriptions")
+      .select("id", { count: "exact", head: true })
+      .eq("userId", req.user.id);
+
+    res.json({ subscribed: (count || 0) > 0, deviceCount: count });
   } catch (error) {
     console.error("Failed to get push status:", error);
     res.status(500).json({ error: "Failed to get push status" });

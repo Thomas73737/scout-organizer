@@ -2,17 +2,17 @@ import { Router } from "express";
 import { randomUUID } from "crypto";
 import * as XLSX from "xlsx";
 import { hashPassword } from "../lib/password";
-import {
-  AccessRequestModel,
-  UserModel,
-  ScoutProfileModel,
-} from "@workspace/db";
+import { supabase } from "@workspace/db";
 
 const router = Router();
 
 async function ensureLeaderOrDeveloper(userId: string) {
-  const profile = await ScoutProfileModel.findOne({ userId });
-  return profile && (profile.role === "leader" || profile.role === "developer" || profile.role === "cp_of_cps");
+  const { data } = await supabase
+    .from("scout_profiles")
+    .select("role")
+    .eq("userId", userId)
+    .single();
+  return data && (data.role === "leader" || data.role === "developer" || data.role === "cp_of_cps");
 }
 
 router.post("/access-requests", async (req, res) => {
@@ -68,9 +68,7 @@ router.post("/access-requests", async (req, res) => {
       res.status(400).json({ error: "nationalId, parentsWhatsappNumber, homeAddress, and photoUrl are required for new scouts" });
       return;
     }
-    // Patrol is not required for new scouts
   } else {
-    // For existing scouts, patrol is required
     if (!patrol) {
       res.status(400).json({ error: "patrol is required for existing scouts" });
       return;
@@ -100,9 +98,12 @@ router.post("/access-requests", async (req, res) => {
 
   try {
     // Check if user already exists by email or phone
-    const existingUser = await UserModel.findOne({ 
-      $or: [{ email: email.trim() }, { phone: phone.trim() }] 
-    });
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("id")
+      .or(`email.eq.${email.trim()},phone.eq.${phone.trim()}`)
+      .maybeSingle();
+
     if (existingUser) {
       res.status(400).json({ error: "A user with this email or phone number already exists" });
       return;
@@ -110,33 +111,33 @@ router.post("/access-requests", async (req, res) => {
 
     // Create user with pending status
     const newUserId = randomUUID();
-    const nameParts = name.trim().split(/\s+/);
-    const user = await UserModel.create({
+    const namePartsArr = name.trim().split(/\s+/);
+    await supabase.from("users").insert({
       id: newUserId,
-      firstName: nameParts[0], // First name
-      lastName: nameParts.slice(1).join(" "), // Middle and last names combined
+      firstName: namePartsArr[0],
+      lastName: namePartsArr.slice(1).join(" "),
       email: email.trim(),
       password: hashPassword(password),
       phone: phone.trim(),
-      section: section,
+      section,
       team: trimmedTeam,
       profileImageUrl: isNewScout ? photoUrl : undefined,
       nationalId: isNewScout ? nationalId : undefined,
       parentsWhatsappNumber: isNewScout ? parentsWhatsappNumber : undefined,
       homeAddress: isNewScout ? homeAddress : undefined,
       parentNationalIdPhotoUrl: isNewScout ? parentNationalIdPhotoUrl : undefined,
-      patrol: patrol || undefined, // Save patrol only if provided
+      patrol: patrol || undefined,
       status: "pending",
     });
 
     // Create corresponding access request for tracking
-    await AccessRequestModel.create({
+    await supabase.from("access_requests").insert({
       id: randomUUID(),
       name: name.trim(),
       email: email.trim(),
       password: hashPassword(password),
       phone: phone.trim(),
-      section: section,
+      section,
       team: trimmedTeam,
       isNewScout,
       nationalId: isNewScout ? nationalId : undefined,
@@ -144,7 +145,7 @@ router.post("/access-requests", async (req, res) => {
       homeAddress: isNewScout ? homeAddress : undefined,
       photoUrl: isNewScout ? photoUrl : undefined,
       parentNationalIdPhotoUrl: isNewScout ? parentNationalIdPhotoUrl : undefined,
-      patrol: patrol || undefined, // Save patrol only if provided
+      patrol: patrol || undefined,
       status: "pending",
     });
 
@@ -170,8 +171,12 @@ router.get("/access-requests", async (req, res) => {
     return;
   }
 
-  const requests = await AccessRequestModel.find().sort({ createdAt: -1 });
-  res.json(requests);
+  const { data: requests } = await supabase
+    .from("access_requests")
+    .select("*")
+    .order("createdAt", { ascending: false });
+
+  res.json(requests || []);
 });
 
 router.post("/access-requests/:requestId/approve", async (req, res) => {
@@ -186,7 +191,11 @@ router.post("/access-requests/:requestId/approve", async (req, res) => {
   }
 
   const requestId = req.params.requestId;
-  const request = await AccessRequestModel.findOne({ id: requestId });
+  const { data: request } = await supabase
+    .from("access_requests")
+    .select("*")
+    .eq("id", requestId)
+    .single();
 
   if (!request) {
     res.status(404).json({ error: "Request not found" });
@@ -200,7 +209,11 @@ router.post("/access-requests/:requestId/approve", async (req, res) => {
 
   try {
     // Find the user by email (created during registration)
-    const user = await UserModel.findOne({ email: request.email });
+    const { data: user } = await supabase
+      .from("users")
+      .select("*")
+      .eq("email", request.email)
+      .single();
     
     if (!user) {
       res.status(404).json({ error: "User not found" });
@@ -208,33 +221,42 @@ router.post("/access-requests/:requestId/approve", async (req, res) => {
     }
 
     // Update user status to approved and copy additional fields from request
-    user.status = "approved";
-    user.updatedAt = new Date();
+    const updateData: Record<string, unknown> = {
+      status: "approved",
+      updatedAt: new Date().toISOString(),
+    };
     
-    // Copy new scout fields if they exist in the request
-    if (request.whatsappNumber) user.whatsappNumber = request.whatsappNumber;
-    if (request.parentsWhatsappNumber) user.parentsWhatsappNumber = request.parentsWhatsappNumber;
-    if (request.homeAddress) user.homeAddress = request.homeAddress;
-    if (request.photoUrl) user.profileImageUrl = request.photoUrl;
-    // Copy patrol if provided in the request (for both new and existing scouts)
-    if (request.patrol) user.patrol = request.patrol;
-    
-    await user.save();
+    if (request.whatsappNumber) updateData.whatsappNumber = request.whatsappNumber;
+    if (request.parentsWhatsappNumber) updateData.parentsWhatsappNumber = request.parentsWhatsappNumber;
+    if (request.homeAddress) updateData.homeAddress = request.homeAddress;
+    if (request.photoUrl) updateData.profileImageUrl = request.photoUrl;
+    if (request.patrol) updateData.patrol = request.patrol;
+
+    await supabase
+      .from("users")
+      .update(updateData)
+      .eq("id", user.id);
 
     // Create scout profile
-    const existingProfile = await ScoutProfileModel.findOne({ userId: user.id });
+    const { data: existingProfile } = await supabase
+      .from("scout_profiles")
+      .select("id")
+      .eq("userId", user.id)
+      .maybeSingle();
+
     if (!existingProfile) {
-      await ScoutProfileModel.create({
+      await supabase.from("scout_profiles").insert({
         id: randomUUID(),
-        userId: user.id!,
+        userId: user.id,
         role: "scout",
       });
     }
 
     // Update access request status
-    request.status = "approved";
-    request.updatedAt = new Date();
-    await request.save();
+    await supabase
+      .from("access_requests")
+      .update({ status: "approved", updatedAt: new Date().toISOString() })
+      .eq("id", requestId);
 
     res.json({ message: "Request approved and account activated", userId: user.id });
   } catch (err: any) {
@@ -255,7 +277,11 @@ router.post("/access-requests/:requestId/deny", async (req, res) => {
   }
 
   const requestId = req.params.requestId;
-  const request = await AccessRequestModel.findOne({ id: requestId });
+  const { data: request } = await supabase
+    .from("access_requests")
+    .select("*")
+    .eq("id", requestId)
+    .single();
 
   if (!request) {
     res.status(404).json({ error: "Request not found" });
@@ -269,19 +295,24 @@ router.post("/access-requests/:requestId/deny", async (req, res) => {
 
   try {
     // Find the user by email (created during registration)
-    const user = await UserModel.findOne({ email: request.email });
+    const { data: user } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", request.email)
+      .maybeSingle();
     
     if (user) {
-      // Update user status to denied
-      user.status = "denied";
-      user.updatedAt = new Date();
-      await user.save();
+      await supabase
+        .from("users")
+        .update({ status: "denied", updatedAt: new Date().toISOString() })
+        .eq("id", user.id);
     }
 
     // Update access request status
-    request.status = "denied";
-    request.updatedAt = new Date();
-    await request.save();
+    await supabase
+      .from("access_requests")
+      .update({ status: "denied", updatedAt: new Date().toISOString() })
+      .eq("id", requestId);
 
     res.json({ message: "Request denied" });
   } catch (err: any) {
@@ -302,11 +333,13 @@ router.get("/access-requests/export", async (req, res) => {
   }
 
   try {
-    const requests = await AccessRequestModel.find({ isNewScout: true })
-      .sort({ createdAt: -1 })
-      .lean();
+    const { data: requests } = await supabase
+      .from("access_requests")
+      .select("*")
+      .eq("isNewScout", true)
+      .order("createdAt", { ascending: false });
 
-    const data = requests.map((r, i) => ({
+    const data = (requests || []).map((r, i) => ({
       "#": i + 1,
       "Name": r.name || "",
       "Email": r.email || "",

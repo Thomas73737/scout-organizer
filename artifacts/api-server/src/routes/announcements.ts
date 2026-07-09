@@ -1,25 +1,28 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
-import { AnnouncementModel, ScoutProfileModel, UserModel, NotificationModel, PushSubscriptionModel } from "@workspace/db";
+import { supabase } from "@workspace/db";
 import { CreateAnnouncementBody } from "@workspace/api-zod";
 import { sendPushNotificationToMany } from "../lib/pushNotification";
 
 const router = Router();
 
-async function getProfile(userId: string) {
-  const profile = await ScoutProfileModel.findOne({ userId });
-  return profile;
-}
-
 async function isDeveloperOrLeader(userId: string): Promise<boolean> {
-  const profile = await ScoutProfileModel.findOne({ userId });
-  return profile?.role === "developer" || profile?.role === "leader" || profile?.role === "cp_of_cps";
+  const { data } = await supabase
+    .from("scout_profiles")
+    .select("role")
+    .eq("userId", userId)
+    .single();
+  return data?.role === "developer" || data?.role === "leader" || data?.role === "cp_of_cps";
 }
 
 async function ensureProfile(userId: string) {
-  const existing = await ScoutProfileModel.findOne({ userId });
+  const { data: existing } = await supabase
+    .from("scout_profiles")
+    .select("id")
+    .eq("userId", userId)
+    .single();
   if (!existing) {
-    await ScoutProfileModel.create({
+    await supabase.from("scout_profiles").insert({
       id: randomUUID(),
       userId,
       role: "scout",
@@ -33,14 +36,24 @@ router.get("/announcements", async (req, res) => {
     return;
   }
 
-  const announcements = await AnnouncementModel.find()
-    .sort({ createdAt: -1 })
-    .lean();
+  const { data: announcements } = await supabase
+    .from("announcements")
+    .select("*")
+    .order("createdAt", { ascending: false });
+
+  if (!announcements) {
+    res.json([]);
+    return;
+  }
 
   // Enrich with author information
   const enrichedAnnouncements = await Promise.all(
     announcements.map(async (announcement) => {
-      const author = await UserModel.findOne({ id: announcement.authorUserId }).lean();
+      const { data: author } = await supabase
+        .from("users")
+        .select("firstName, lastName, profileImageUrl")
+        .eq("id", announcement.authorUserId)
+        .single();
       return {
         ...announcement,
         authorName: author ? `${author.firstName ?? ""} ${author.lastName ?? ""}`.trim() : null,
@@ -70,77 +83,94 @@ router.post("/announcements", async (req, res) => {
     return;
   }
 
-  const announcement = await AnnouncementModel.create({
-    id: randomUUID(),
+  const announcementId = randomUUID();
+  await supabase.from("announcements").insert({
+    id: announcementId,
     title: parsed.data.title,
     content: parsed.data.content,
     authorUserId: req.user.id,
   });
 
-  const author = await UserModel.findOne({ id: req.user.id }).lean();
+  const { data: author } = await supabase
+    .from("users")
+    .select("firstName, lastName, profileImageUrl")
+    .eq("id", req.user.id)
+    .single();
   const authorName = author ? `${author.firstName ?? ""} ${author.lastName ?? ""}`.trim() : "Someone";
 
   // Create notifications for all users except the author
   try {
-    const allUsers = await UserModel.find({ id: { $ne: req.user.id } }).lean();
-    const notifications = allUsers.map((user) => ({
-      id: randomUUID(),
-      userId: user.id,
-      type: "announcement" as const,
-      title: "New Announcement",
-      message: parsed.data.title,
-      relatedId: announcement.id,
-      authorName,
-      isRead: false,
-    }));
-    if (notifications.length > 0) {
-      await NotificationModel.insertMany(notifications);
-    }
+    const { data: allUsers } = await supabase
+      .from("users")
+      .select("id")
+      .neq("id", req.user.id);
 
-    // Send push notifications to users with registered push subscriptions
-    try {
-      const subscriptions = await PushSubscriptionModel.find({
-        userId: { $in: allUsers.map((u) => u.id) },
-      }).lean();
+    if (allUsers && allUsers.length > 0) {
+      const notifications = allUsers.map((user) => ({
+        id: randomUUID(),
+        userId: user.id,
+        type: "announcement" as const,
+        title: "New Announcement",
+        message: parsed.data.title,
+        relatedId: announcementId,
+        authorName,
+        isRead: false,
+      }));
+      await supabase.from("notifications").insert(notifications);
 
-      if (subscriptions.length > 0) {
-        const pushData = subscriptions.map((sub) => ({
-          endpoint: sub.endpoint,
-          keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth },
-        }));
+      // Send push notifications
+      try {
+        const { data: subscriptions } = await supabase
+          .from("push_subscriptions")
+          .select("*")
+          .in("userId", allUsers.map((u) => u.id));
 
-        const result = await sendPushNotificationToMany(
-          pushData,
-          "New Announcement",
-          `${authorName} posted: ${parsed.data.title}`,
-          {
-            type: "announcement",
-            announcementId: announcement.id,
-            url: "/announcements",
-          },
-        );
+        if (subscriptions && subscriptions.length > 0) {
+          const pushData = subscriptions.map((sub) => ({
+            endpoint: sub.endpoint,
+            keys: { p256dh: sub.keyP256dh, auth: sub.keyAuth },
+          }));
 
-        console.log(`Push notifications sent: ${result.successful} successful, ${result.failed.length} failed`);
+          const result = await sendPushNotificationToMany(
+            pushData,
+            "New Announcement",
+            `${authorName} posted: ${parsed.data.title}`,
+            {
+              type: "announcement",
+              announcementId,
+              url: "/announcements",
+            },
+          );
 
-        // Remove expired subscriptions
-        if (result.failed.length > 0) {
-          const expiredEndpoints = result.failed.map((f) => f.subscription.endpoint);
-          await PushSubscriptionModel.deleteMany({ endpoint: { $in: expiredEndpoints } });
-          console.log(`Removed ${result.failed.length} expired subscriptions`);
+          console.log(`Push notifications sent: ${result.successful} successful, ${result.failed.length} failed`);
+
+          // Remove expired subscriptions
+          if (result.failed.length > 0) {
+            const expiredEndpoints = result.failed.map((f) => f.subscription.endpoint);
+            await supabase
+              .from("push_subscriptions")
+              .delete()
+              .in("endpoint", expiredEndpoints);
+            console.log(`Removed ${result.failed.length} expired subscriptions`);
+          }
+        } else {
+          console.log("No push subscriptions found");
         }
-      } else {
-        console.log("No push subscriptions found");
+      } catch (pushError) {
+        console.error("Failed to send push notifications:", pushError);
       }
-    } catch (pushError) {
-      console.error("Failed to send push notifications:", pushError);
     }
   } catch (err) {
     console.error("Failed to create notifications:", err);
   }
 
   res.status(201).json({
-    ...announcement.toObject(),
-    authorName: author ? `${author.firstName ?? ""} ${author.lastName ?? ""}`.trim() : null,
+    id: announcementId,
+    title: parsed.data.title,
+    content: parsed.data.content,
+    authorUserId: req.user.id,
+    createdAt: new Date().toISOString(),
+    authorName,
     authorImageUrl: author?.profileImageUrl ?? null,
   });
 });
@@ -163,7 +193,7 @@ router.delete("/announcements/:announcementId", async (req, res) => {
     return;
   }
 
-  await AnnouncementModel.deleteOne({ id: announcementId });
+  await supabase.from("announcements").delete().eq("id", announcementId);
   res.json({ success: true });
 });
 

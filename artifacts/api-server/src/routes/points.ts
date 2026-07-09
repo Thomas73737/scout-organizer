@@ -1,18 +1,26 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
-import { PointTransactionModel, UserModel, ScoutProfileModel } from "@workspace/db";
+import { supabase } from "@workspace/db";
 
 const router = Router();
 
 async function isDeveloperOrLeader(userId: string): Promise<boolean> {
-  const profile = await ScoutProfileModel.findOne({ userId });
-  return profile?.role === "developer" || profile?.role === "leader" || profile?.role === "cp_of_cps";
+  const { data } = await supabase
+    .from("scout_profiles")
+    .select("role")
+    .eq("userId", userId)
+    .single();
+  return data?.role === "developer" || data?.role === "leader" || data?.role === "cp_of_cps";
 }
 
 async function ensureProfile(userId: string) {
-  const existing = await ScoutProfileModel.findOne({ userId });
+  const { data: existing } = await supabase
+    .from("scout_profiles")
+    .select("id")
+    .eq("userId", userId)
+    .single();
   if (!existing) {
-    await ScoutProfileModel.create({ id: randomUUID(), userId, role: "scout" });
+    await supabase.from("scout_profiles").insert({ id: randomUUID(), userId, role: "scout" });
   }
 }
 
@@ -34,21 +42,28 @@ router.post("/points/award", async (req, res) => {
     return;
   }
 
-  const target = await UserModel.findOne({ id: userId });
+  const { data: target } = await supabase
+    .from("users")
+    .select("id")
+    .eq("id", userId)
+    .single();
   if (!target) {
     res.status(404).json({ error: "User not found" });
     return;
   }
 
-  const transaction = await PointTransactionModel.create({
+  const transactionData = {
     id: randomUUID(),
     userId,
     points,
     reason,
     awardedBy: req.user.id,
-  });
+    createdAt: new Date().toISOString(),
+  };
 
-  res.status(201).json(transaction.toObject());
+  await supabase.from("point_transactions").insert(transactionData);
+
+  res.status(201).json(transactionData);
 });
 
 router.get("/points/my", async (req, res) => {
@@ -58,13 +73,15 @@ router.get("/points/my", async (req, res) => {
   }
   await ensureProfile(req.user.id);
 
-  const transactions = await PointTransactionModel.find({ userId: req.user.id })
-    .sort({ createdAt: -1 })
-    .lean();
+  const { data: transactions } = await supabase
+    .from("point_transactions")
+    .select("*")
+    .eq("userId", req.user.id)
+    .order("createdAt", { ascending: false });
 
-  const totalPoints = transactions.reduce((sum, t) => sum + t.points, 0);
+  const totalPoints = (transactions || []).reduce((sum, t) => sum + t.points, 0);
 
-  res.json({ totalPoints, transactions });
+  res.json({ totalPoints, transactions: transactions || [] });
 });
 
 router.get("/points/user/:userId", async (req, res) => {
@@ -75,17 +92,23 @@ router.get("/points/user/:userId", async (req, res) => {
   await ensureProfile(req.user.id);
 
   const targetUserId = req.params.userId;
-  const transactions = await PointTransactionModel.find({ userId: targetUserId })
-    .sort({ createdAt: -1 })
-    .lean();
+  const { data: transactions } = await supabase
+    .from("point_transactions")
+    .select("*")
+    .eq("userId", targetUserId)
+    .order("createdAt", { ascending: false });
 
-  const totalPoints = transactions.reduce((sum, t) => sum + t.points, 0);
+  const totalPoints = (transactions || []).reduce((sum, t) => sum + t.points, 0);
 
-  const user = await UserModel.findOne({ id: targetUserId }).lean();
+  const { data: user } = await supabase
+    .from("users")
+    .select("id, firstName, lastName, profileImageUrl")
+    .eq("id", targetUserId)
+    .single();
 
   res.json({
     totalPoints,
-    transactions,
+    transactions: transactions || [],
     user: user ? {
       id: user.id,
       firstName: user.firstName,
@@ -102,20 +125,27 @@ router.get("/points/leaderboard", async (req, res) => {
   }
   await ensureProfile(req.user.id);
 
-  const allTransactions = await PointTransactionModel.find().lean();
+  const { data: allTransactions } = await supabase
+    .from("point_transactions")
+    .select("userId, points");
+
+  if (!allTransactions || allTransactions.length === 0) {
+    res.json([]);
+    return;
+  }
+
   const pointsMap = new Map<string, number>();
   for (const t of allTransactions) {
     pointsMap.set(t.userId, (pointsMap.get(t.userId) || 0) + t.points);
   }
 
-  if (pointsMap.size === 0) {
-    res.json([]);
-    return;
-  }
-
   const userIds = Array.from(pointsMap.keys());
-  const users = await UserModel.find({ id: { $in: userIds } }).lean();
-  const userMap = new Map(users.map((u) => [u.id, u]));
+  const { data: users } = await supabase
+    .from("users")
+    .select("id, firstName, lastName, profileImageUrl")
+    .in("id", userIds);
+
+  const userMap = new Map((users || []).map((u) => [u.id, u]));
 
   const leaderboard = userIds
     .map((userId) => {

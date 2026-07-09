@@ -1,7 +1,7 @@
 import * as client from "openid-client";
 import crypto from "crypto";
 import { type Request, type Response } from "express";
-import { SessionModel } from "@workspace/db";
+import { supabase } from "@workspace/db";
 import type { AuthUser } from "@workspace/api-zod";
 
 export const ISSUER_URL = process.env.ISSUER_URL ?? "https://replit.com/oidc";
@@ -29,18 +29,22 @@ export async function getOidcConfig(): Promise<client.Configuration> {
 
 export async function createSession(data: SessionData): Promise<string> {
   const sid = crypto.randomBytes(32).toString("hex");
-  await SessionModel.create({
+  await supabase.from("sessions").insert({
     sid,
     sess: data as unknown as Record<string, unknown>,
-    expire: new Date(Date.now() + SESSION_TTL),
+    expire: new Date(Date.now() + SESSION_TTL).toISOString(),
   });
   return sid;
 }
 
 export async function getSession(sid: string): Promise<SessionData | null> {
-  const row = await SessionModel.findOne({ sid });
+  const { data: row } = await supabase
+    .from("sessions")
+    .select("*")
+    .eq("sid", sid)
+    .single();
 
-  if (!row || (row.expire && row.expire < new Date())) {
+  if (!row || (row.expire && new Date(row.expire) < new Date())) {
     if (row) await deleteSession(sid);
     return null;
   }
@@ -52,17 +56,17 @@ export async function updateSession(
   sid: string,
   data: SessionData,
 ): Promise<void> {
-  await SessionModel.findOneAndUpdate(
-    { sid },
-    {
+  await supabase
+    .from("sessions")
+    .update({
       sess: data as unknown as Record<string, unknown>,
-      expire: new Date(Date.now() + SESSION_TTL),
-    },
-  );
+      expire: new Date(Date.now() + SESSION_TTL).toISOString(),
+    })
+    .eq("sid", sid);
 }
 
 export async function deleteSession(sid: string): Promise<void> {
-  await SessionModel.deleteOne({ sid });
+  await supabase.from("sessions").delete().eq("sid", sid);
 }
 
 export async function clearSession(

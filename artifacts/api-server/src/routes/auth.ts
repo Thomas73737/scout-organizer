@@ -3,7 +3,7 @@ import { Router, type IRouter, type Request, type Response } from "express";
 import {
   GetCurrentAuthUserResponse,
 } from "@workspace/api-zod";
-import { UserModel } from "@workspace/db";
+import { supabase } from "@workspace/db";
 import {
   clearSession,
   getOidcConfig,
@@ -66,32 +66,64 @@ function getSafeReturnTo(value: unknown): string {
 }
 
 async function upsertUser(claims: Record<string, unknown>) {
-  const userData: Record<string, unknown> = {
-    id: claims.sub as string,
-    firstName: (claims.first_name as string) || undefined,
-    lastName: (claims.last_name as string) || undefined,
-    phone: (claims.phone_number as string) || "0000000000",
-    updatedAt: new Date(),
-  };
-
-  // Only include email if it exists in claims
-  if (claims.email) {
-    userData.email = claims.email as string;
-  }
-
-  // Only set profileImageUrl from OIDC on user creation, not on every login,
-  // so that users can remove/change their profile picture without it being overwritten
+  const userId = claims.sub as string;
   const oidcProfileImageUrl = (claims.profile_image_url || claims.picture) as string | undefined;
 
-  const user = await UserModel.findOneAndUpdate(
-    { id: userData.id },
-    {
-      $set: userData,
-      ...(oidcProfileImageUrl ? { $setOnInsert: { profileImageUrl: oidcProfileImageUrl } } : {}),
-    },
-    { upsert: true, new: true }
-  );
-  return user;
+  // Check if user exists
+  const { data: existingUser } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id", userId)
+    .maybeSingle();
+
+  if (existingUser) {
+    // Update existing user
+    const updateData: Record<string, unknown> = {
+      firstName: (claims.first_name as string) || existingUser.firstName,
+      lastName: (claims.last_name as string) || existingUser.lastName,
+      phone: (claims.phone_number as string) || existingUser.phone,
+      updatedAt: new Date().toISOString(),
+    };
+    if (claims.email) {
+      updateData.email = claims.email as string;
+    }
+
+    await supabase
+      .from("users")
+      .update(updateData)
+      .eq("id", userId);
+
+    const { data: updated } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", userId)
+      .single();
+    return updated;
+  } else {
+    // Create new user
+    const newUserData: Record<string, unknown> = {
+      id: userId,
+      firstName: (claims.first_name as string) || null,
+      lastName: (claims.last_name as string) || null,
+      phone: (claims.phone_number as string) || "0000000000",
+      updatedAt: new Date().toISOString(),
+    };
+    if (claims.email) {
+      newUserData.email = claims.email as string;
+    }
+    if (oidcProfileImageUrl) {
+      newUserData.profileImageUrl = oidcProfileImageUrl;
+    }
+
+    await supabase.from("users").insert(newUserData);
+
+    const { data: created } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", userId)
+      .single();
+    return created;
+  }
 }
 
 router.get("/auth/user", async (req: Request, res: Response) => {
@@ -256,9 +288,4 @@ router.get("/logout", async (req: Request, res: Response) => {
   res.redirect("/");
 });
 
-
 export default router;
-
-
-
-// I want you to know its was soo hard to build thomas shohdy :)

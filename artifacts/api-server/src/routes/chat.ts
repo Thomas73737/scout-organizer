@@ -1,19 +1,18 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
-import { ChatMessageModel, UserModel, ScoutProfileModel, NotificationModel, PushSubscriptionModel } from "@workspace/db";
+import { supabase } from "@workspace/db";
 import { sendPushNotificationToMany } from "../lib/pushNotification";
 
 const router = Router();
 
-async function isDeveloperOrLeader(userId: string): Promise<boolean> {
-  const profile = await ScoutProfileModel.findOne({ userId });
-  return profile?.role === "developer" || profile?.role === "leader" || profile?.role === "cp_of_cps";
-}
-
 async function ensureProfile(userId: string) {
-  const existing = await ScoutProfileModel.findOne({ userId });
+  const { data: existing } = await supabase
+    .from("scout_profiles")
+    .select("id")
+    .eq("userId", userId)
+    .single();
   if (!existing) {
-    await ScoutProfileModel.create({ id: randomUUID(), userId, role: "scout" });
+    await supabase.from("scout_profiles").insert({ id: randomUUID(), userId, role: "scout" });
   }
 }
 
@@ -25,11 +24,16 @@ router.get("/chat/conversations", async (req, res) => {
   await ensureProfile(req.user.id);
 
   const userId = req.user.id;
-  const messages = await ChatMessageModel.find({
-    $or: [{ senderId: userId }, { receiverId: userId }],
-  })
-    .sort({ createdAt: -1 })
-    .lean();
+  const { data: messages } = await supabase
+    .from("chat_messages")
+    .select("*")
+    .or(`senderId.eq.${userId},receiverId.eq.${userId}`)
+    .order("createdAt", { ascending: false });
+
+  if (!messages) {
+    res.json([]);
+    return;
+  }
 
   const userIds = new Set<string>();
   for (const msg of messages) {
@@ -37,8 +41,12 @@ router.get("/chat/conversations", async (req, res) => {
     if (msg.receiverId !== userId) userIds.add(msg.receiverId);
   }
 
-  const users = await UserModel.find({ id: { $in: Array.from(userIds) } }).lean();
-  const userMap = new Map(users.map((u) => [u.id, u]));
+  const { data: users } = await supabase
+    .from("users")
+    .select("id, firstName, lastName, profileImageUrl")
+    .in("id", Array.from(userIds));
+
+  const userMap = new Map((users || []).map((u) => [u.id, u]));
 
   const conversationMap = new Map<string, { userId: string; firstName: string | null; lastName: string | null; profileImageUrl: string | null; lastMessage: string; lastMessageTime: Date; unreadCount: number }>();
 
@@ -53,7 +61,7 @@ router.get("/chat/conversations", async (req, res) => {
         lastName: other?.lastName ?? null,
         profileImageUrl: other?.profileImageUrl ?? null,
         lastMessage: lastMsg,
-        lastMessageTime: msg.createdAt!,
+        lastMessageTime: new Date(msg.createdAt!),
         unreadCount: msg.receiverId === userId && !msg.isRead ? 1 : 0,
       });
     } else {
@@ -80,24 +88,29 @@ router.get("/chat/messages/:otherUserId", async (req, res) => {
   const { otherUserId } = req.params;
   const userId = req.user.id;
 
-  const messages = await ChatMessageModel.find({
-    $or: [
-      { senderId: userId, receiverId: otherUserId },
-      { senderId: otherUserId, receiverId: userId },
-    ],
-  })
-    .sort({ createdAt: 1 })
-    .lean();
+  const { data: messages } = await supabase
+    .from("chat_messages")
+    .select("*")
+    .or(
+      `and(senderId.eq.${userId},receiverId.eq.${otherUserId}),and(senderId.eq.${otherUserId},receiverId.eq.${userId})`
+    )
+    .order("createdAt", { ascending: true });
 
   const userIds = [userId, otherUserId];
-  const users = await UserModel.find({ id: { $in: userIds } }).lean();
-  const userMap = new Map(users.map((u) => [u.id, u]));
+  const { data: users } = await supabase
+    .from("users")
+    .select("id, firstName, lastName, profileImageUrl")
+    .in("id", userIds);
+  const userMap = new Map((users || []).map((u) => [u.id, u]));
 
-  const replyToIds = messages.map((m) => m.replyToId).filter(Boolean) as string[];
+  const replyToIds = (messages || []).map((m) => m.replyToId).filter(Boolean) as string[];
   let replyToMap = new Map<string, { content: string; senderName: string }>();
   if (replyToIds.length > 0) {
-    const repliedMessages = await ChatMessageModel.find({ id: { $in: replyToIds } }).lean();
-    for (const rm of repliedMessages) {
+    const { data: repliedMessages } = await supabase
+      .from("chat_messages")
+      .select("id, content, senderId, isDeleted")
+      .in("id", replyToIds);
+    for (const rm of repliedMessages || []) {
       const ru = userMap.get(rm.senderId);
       const rn = ru ? `${ru.firstName ?? ""} ${ru.lastName ?? ""}`.trim() : "Unknown";
       const rc = rm.isDeleted ? "Message deleted" : rm.content;
@@ -105,7 +118,7 @@ router.get("/chat/messages/:otherUserId", async (req, res) => {
     }
   }
 
-  const enriched = messages.map((msg) => ({
+  const enriched = (messages || []).map((msg) => ({
     ...msg,
     senderName: userMap.get(msg.senderId) ? `${userMap.get(msg.senderId)!.firstName ?? ""} ${userMap.get(msg.senderId)!.lastName ?? ""}`.trim() : null,
     senderImageUrl: userMap.get(msg.senderId)?.profileImageUrl ?? null,
@@ -114,10 +127,12 @@ router.get("/chat/messages/:otherUserId", async (req, res) => {
     replyTo: msg.replyToId ? (replyToMap.get(msg.replyToId) ?? null) : null,
   }));
 
-  await ChatMessageModel.updateMany(
-    { senderId: otherUserId, receiverId: userId, isRead: false },
-    { isRead: true },
-  );
+  await supabase
+    .from("chat_messages")
+    .update({ isRead: true })
+    .eq("senderId", otherUserId)
+    .eq("receiverId", userId)
+    .eq("isRead", false);
 
   res.json(enriched);
 });
@@ -135,51 +150,68 @@ router.post("/chat/send", async (req, res) => {
     return;
   }
 
-  const receiver = await UserModel.findOne({ id: receiverId });
+  const { data: receiver } = await supabase
+    .from("users")
+    .select("id")
+    .eq("id", receiverId)
+    .single();
   if (!receiver) {
     res.status(404).json({ error: "Receiver not found" });
     return;
   }
 
-  const message = await ChatMessageModel.create({
-    id: randomUUID(),
+  const messageId = randomUUID();
+  const messageData = {
+    id: messageId,
     senderId: req.user.id,
     receiverId,
     content,
     isRead: false,
-    ...(replyToId ? { replyToId } : {}),
-  });
+    replyToId: replyToId || null,
+    createdAt: new Date().toISOString(),
+  };
 
-  const sender = await UserModel.findOne({ id: req.user.id }).lean();
+  await supabase.from("chat_messages").insert(messageData);
+
+  const { data: sender } = await supabase
+    .from("users")
+    .select("firstName, lastName")
+    .eq("id", req.user.id)
+    .single();
   const senderName = sender ? `${sender.firstName ?? ""} ${sender.lastName ?? ""}`.trim() : "Unknown";
 
-  await NotificationModel.create({
+  await supabase.from("notifications").insert({
     id: randomUUID(),
     userId: receiverId,
     type: "message",
     title: "New Message",
     message: content,
-    relatedId: message.id,
+    relatedId: messageId,
     authorName: senderName,
     isRead: false,
   });
 
-  const subscriptions = await PushSubscriptionModel.find({ userId: receiverId }).lean();
-  if (subscriptions.length > 0) {
+  const { data: subscriptions } = await supabase
+    .from("push_subscriptions")
+    .select("endpoint, keyP256dh, keyAuth")
+    .eq("userId", receiverId);
+
+  if (subscriptions && subscriptions.length > 0) {
     const pushResult = await sendPushNotificationToMany(
-      subscriptions.map((s) => ({ endpoint: s.endpoint, keys: s.keys })),
+      subscriptions.map((s) => ({ endpoint: s.endpoint, keys: { p256dh: s.keyP256dh, auth: s.keyAuth } })),
       senderName,
       content,
-      { type: "message", messageId: message.id, url: "/chat" },
+      { type: "message", messageId, url: "/chat" },
     );
     if (pushResult.failed.length > 0) {
-      await PushSubscriptionModel.deleteMany({
-        endpoint: { $in: pushResult.failed.map((f) => f.subscription.endpoint) },
-      });
+      await supabase
+        .from("push_subscriptions")
+        .delete()
+        .in("endpoint", pushResult.failed.map((f) => f.subscription.endpoint));
     }
   }
 
-  res.status(201).json(message.toObject());
+  res.status(201).json(messageData);
 });
 
 router.put("/chat/messages/:messageId", async (req, res) => {
@@ -195,7 +227,11 @@ router.put("/chat/messages/:messageId", async (req, res) => {
     return;
   }
 
-  const message = await ChatMessageModel.findOne({ id: messageId });
+  const { data: message } = await supabase
+    .from("chat_messages")
+    .select("*")
+    .eq("id", messageId)
+    .single();
   if (!message) {
     res.status(404).json({ error: "Message not found" });
     return;
@@ -206,11 +242,12 @@ router.put("/chat/messages/:messageId", async (req, res) => {
     return;
   }
 
-  message.content = content.trim();
-  message.isEdited = true;
-  await message.save();
+  await supabase
+    .from("chat_messages")
+    .update({ content: content.trim(), isEdited: true })
+    .eq("id", messageId);
 
-  res.json(message.toObject());
+  res.json({ ...message, content: content.trim(), isEdited: true });
 });
 
 router.delete("/chat/messages/:messageId", async (req, res) => {
@@ -221,7 +258,11 @@ router.delete("/chat/messages/:messageId", async (req, res) => {
 
   const { messageId } = req.params;
 
-  const message = await ChatMessageModel.findOne({ id: messageId });
+  const { data: message } = await supabase
+    .from("chat_messages")
+    .select("*")
+    .eq("id", messageId)
+    .single();
   if (!message) {
     res.status(404).json({ error: "Message not found" });
     return;
@@ -232,10 +273,10 @@ router.delete("/chat/messages/:messageId", async (req, res) => {
     return;
   }
 
-  message.content = "This message was deleted";
-  message.isDeleted = true;
-  message.isEdited = false;
-  await message.save();
+  await supabase
+    .from("chat_messages")
+    .update({ content: "This message was deleted", isDeleted: true, isEdited: false })
+    .eq("id", messageId);
 
   res.json({ success: true });
 });
@@ -246,12 +287,13 @@ router.get("/chat/unread-count", async (req, res) => {
     return;
   }
 
-  const count = await ChatMessageModel.countDocuments({
-    receiverId: req.user.id,
-    isRead: false,
-  });
+  const { count } = await supabase
+    .from("chat_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("receiverId", req.user.id)
+    .eq("isRead", false);
 
-  res.json({ unreadCount: count });
+  res.json({ unreadCount: count || 0 });
 });
 
 export default router;

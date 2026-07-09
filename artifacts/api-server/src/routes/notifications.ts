@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { NotificationModel } from "@workspace/db";
+import { supabase } from "@workspace/db";
 
 const router = Router();
 
@@ -9,17 +9,20 @@ router.get("/notifications", async (req, res) => {
     return;
   }
 
-  const notifications = await NotificationModel.find({ userId: req.user.id })
-    .sort({ createdAt: -1 })
-    .limit(50)
-    .lean();
+  const { data: notifications } = await supabase
+    .from("notifications")
+    .select("*")
+    .eq("userId", req.user.id)
+    .order("createdAt", { ascending: false })
+    .limit(50);
 
-  const unreadCount = await NotificationModel.countDocuments({
-    userId: req.user.id,
-    isRead: false,
-  });
+  const { count: unreadCount } = await supabase
+    .from("notifications")
+    .select("*", { count: "exact", head: true })
+    .eq("userId", req.user.id)
+    .eq("isRead", false);
 
-  res.json({ notifications, unreadCount });
+  res.json({ notifications: notifications || [], unreadCount: unreadCount || 0 });
 });
 
 router.post("/notifications/:id/read", async (req, res) => {
@@ -28,10 +31,11 @@ router.post("/notifications/:id/read", async (req, res) => {
     return;
   }
 
-  await NotificationModel.updateOne(
-    { id: req.params.id, userId: req.user.id },
-    { $set: { isRead: true } },
-  );
+  await supabase
+    .from("notifications")
+    .update({ isRead: true })
+    .eq("id", req.params.id)
+    .eq("userId", req.user.id);
 
   res.json({ success: true });
 });
@@ -42,10 +46,11 @@ router.post("/notifications/read-all", async (req, res) => {
     return;
   }
 
-  await NotificationModel.updateMany(
-    { userId: req.user.id, isRead: false },
-    { $set: { isRead: true } },
-  );
+  await supabase
+    .from("notifications")
+    .update({ isRead: true })
+    .eq("userId", req.user.id)
+    .eq("isRead", false);
 
   res.json({ success: true });
 });

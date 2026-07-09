@@ -1,19 +1,27 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
-import { AttendanceSessionModel, AttendanceRecordModel, ScoutProfileModel, UserModel } from "@workspace/db";
+import { supabase } from "@workspace/db";
 import { CreateAttendanceSessionBody, SubmitAttendanceRecordsBody } from "@workspace/api-zod";
 
 const router = Router();
 
 async function getProfile(userId: string) {
-  const profile = await ScoutProfileModel.findOne({ userId });
-  return profile;
+  const { data } = await supabase
+    .from("scout_profiles")
+    .select("*")
+    .eq("userId", userId)
+    .single();
+  return data;
 }
 
 async function ensureProfile(userId: string) {
-  const existing = await ScoutProfileModel.findOne({ userId });
+  const { data: existing } = await supabase
+    .from("scout_profiles")
+    .select("id")
+    .eq("userId", userId)
+    .single();
   if (!existing) {
-    await ScoutProfileModel.create({
+    await supabase.from("scout_profiles").insert({
       id: randomUUID(),
       userId,
       role: "scout",
@@ -22,8 +30,12 @@ async function ensureProfile(userId: string) {
 }
 
 async function isDeveloperOrLeader(userId: string): Promise<boolean> {
-  const profile = await ScoutProfileModel.findOne({ userId });
-  return profile?.role === "developer" || profile?.role === "leader" || profile?.role === "cp_of_cps";
+  const { data } = await supabase
+    .from("scout_profiles")
+    .select("role")
+    .eq("userId", userId)
+    .single();
+  return data?.role === "developer" || data?.role === "leader" || data?.role === "cp_of_cps";
 }
 
 router.get("/attendance/sessions", async (req, res) => {
@@ -32,18 +44,29 @@ router.get("/attendance/sessions", async (req, res) => {
     return;
   }
 
-  const sessions = await AttendanceSessionModel.find()
-    .sort({ sessionDate: -1 })
-    .lean();
+  const { data: sessions } = await supabase
+    .from("attendance_sessions")
+    .select("*")
+    .order("sessionDate", { ascending: false });
+
+  if (!sessions) {
+    res.json([]);
+    return;
+  }
 
   // Enrich with attendance counts
   const enrichedSessions = await Promise.all(
     sessions.map(async (session) => {
-      const records = await AttendanceRecordModel.find({ sessionId: session.id });
-      const attendedCount = records.filter(r => r.status === "present").length;
-      const totalCount = records.length;
-      const excusedCount = records.filter(r => r.status === "absent" && r.excuse === true).length;
-      const withGearCount = records.filter(r => r.hasGear === true).length;
+      const { data: records } = await supabase
+        .from("attendance_records")
+        .select("*")
+        .eq("sessionId", session.id);
+      
+      const allRecords = records || [];
+      const attendedCount = allRecords.filter(r => r.status === "present").length;
+      const totalCount = allRecords.length;
+      const excusedCount = allRecords.filter(r => r.status === "absent" && r.excuse === true).length;
+      const withGearCount = allRecords.filter(r => r.hasGear === true).length;
       
       return {
         ...session,
@@ -76,15 +99,18 @@ router.post("/attendance/sessions", async (req, res) => {
     return;
   }
 
-  const session = await AttendanceSessionModel.create({
-    id: randomUUID(),
+  const newId = randomUUID();
+  const sessionData = {
+    id: newId,
     title: parsed.data.title,
-    sessionDate: new Date(parsed.data.sessionDate),
+    sessionDate: new Date(parsed.data.sessionDate).toISOString(),
     notes: parsed.data.notes || null,
     createdByUserId: req.user.id,
-  });
+  };
 
-  res.status(201).json({ ...session.toObject(), attendedCount: 0, totalCount: 0 });
+  await supabase.from("attendance_sessions").insert(sessionData);
+
+  res.status(201).json({ ...sessionData, attendedCount: 0, totalCount: 0 });
 });
 
 router.get("/attendance/sessions/:sessionId", async (req, res) => {
@@ -99,18 +125,29 @@ router.get("/attendance/sessions/:sessionId", async (req, res) => {
     return;
   }
 
-  const session = await AttendanceSessionModel.findOne({ id: sessionId });
+  const { data: session } = await supabase
+    .from("attendance_sessions")
+    .select("*")
+    .eq("id", sessionId)
+    .single();
   if (!session) {
     res.status(404).json({ error: "Session not found" });
     return;
   }
 
-  const records = await AttendanceRecordModel.find({ sessionId }).lean();
+  const { data: records } = await supabase
+    .from("attendance_records")
+    .select("*")
+    .eq("sessionId", sessionId);
 
   // Enrich with user information
   const enrichedRecords = await Promise.all(
-    records.map(async (record) => {
-      const user = await UserModel.findOne({ id: record.userId }).lean();
+    (records || []).map(async (record) => {
+      const { data: user } = await supabase
+        .from("users")
+        .select("firstName, lastName, profileImageUrl")
+        .eq("id", record.userId)
+        .single();
       return {
         userId: record.userId,
         scoutName: user ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() : null,
@@ -122,7 +159,7 @@ router.get("/attendance/sessions/:sessionId", async (req, res) => {
     })
   );
 
-  res.json({ ...session.toObject(), records: enrichedRecords });
+  res.json({ ...session, records: enrichedRecords });
 });
 
 router.post("/attendance/sessions/:sessionId/records", async (req, res) => {
@@ -150,13 +187,21 @@ router.post("/attendance/sessions/:sessionId/records", async (req, res) => {
   }
 
   // Delete existing records
-  await AttendanceRecordModel.deleteMany({ sessionId });
+  await supabase.from("attendance_records").delete().eq("sessionId", sessionId);
 
   // Get all scouts
-  const allProfiles = await ScoutProfileModel.find({ role: "scout" }).lean();
+  const { data: allProfiles } = await supabase
+    .from("scout_profiles")
+    .select("*")
+    .eq("role", "scout");
+
   const allUsers = await Promise.all(
-    allProfiles.map(async (profile) => {
-      const user = await UserModel.findOne({ id: profile.userId }).lean();
+    (allProfiles || []).map(async (profile) => {
+      const { data: user } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", profile.userId)
+        .single();
       return { ...profile, user };
     })
   );
@@ -164,7 +209,6 @@ router.post("/attendance/sessions/:sessionId/records", async (req, res) => {
   // Insert new records
   if (parsed.data.records.length > 0) {
     const recordsToInsert = parsed.data.records.map((r) => {
-      // Find the scout by replitId (userId from frontend) or profile ID
       const scout = allUsers.find((s) => s.userId === r.userId || s.id === r.userId);
       return {
         id: randomUUID(),
@@ -175,17 +219,29 @@ router.post("/attendance/sessions/:sessionId/records", async (req, res) => {
         hasGear: r.hasGear ?? false,
       };
     });
-    await AttendanceRecordModel.insertMany(recordsToInsert);
+    await supabase.from("attendance_records").insert(recordsToInsert);
   }
 
   // Get updated session and records
-  const session = await AttendanceSessionModel.findOne({ id: sessionId });
-  const records = await AttendanceRecordModel.find({ sessionId }).lean();
+  const { data: session } = await supabase
+    .from("attendance_sessions")
+    .select("*")
+    .eq("id", sessionId)
+    .single();
+
+  const { data: records } = await supabase
+    .from("attendance_records")
+    .select("*")
+    .eq("sessionId", sessionId);
 
   // Enrich with user information
   const enrichedRecords = await Promise.all(
-    records.map(async (record) => {
-      const user = await UserModel.findOne({ id: record.userId }).lean();
+    (records || []).map(async (record) => {
+      const { data: user } = await supabase
+        .from("users")
+        .select("firstName, lastName, profileImageUrl")
+        .eq("id", record.userId)
+        .single();
       return {
         userId: record.userId,
         scoutName: user ? `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim() : null,
@@ -197,7 +253,7 @@ router.post("/attendance/sessions/:sessionId/records", async (req, res) => {
     })
   );
 
-  res.json({ ...session?.toObject(), records: enrichedRecords });
+  res.json({ ...session, records: enrichedRecords });
 });
 
 router.delete("/attendance/sessions/:sessionId/records/:userId", async (req, res) => {
@@ -218,11 +274,24 @@ router.delete("/attendance/sessions/:sessionId/records/:userId", async (req, res
   }
 
   try {
-    const result = await AttendanceRecordModel.deleteOne({ sessionId, userId });
-    if (result.deletedCount === 0) {
+    const { data: existingRecord } = await supabase
+      .from("attendance_records")
+      .select("id")
+      .eq("sessionId", sessionId)
+      .eq("userId", userId)
+      .maybeSingle();
+
+    if (!existingRecord) {
       res.status(404).json({ error: "Attendance record not found" });
       return;
     }
+
+    await supabase
+      .from("attendance_records")
+      .delete()
+      .eq("sessionId", sessionId)
+      .eq("userId", userId);
+
     res.json({ message: "Attendance record deleted successfully" });
   } catch (err: any) {
     console.error("Failed to delete attendance record:", err?.message ?? err);
@@ -247,15 +316,19 @@ router.delete("/attendance/sessions/:sessionId", async (req, res) => {
     return;
   }
 
-  const session = await AttendanceSessionModel.findOne({ id: sessionId });
+  const { data: session } = await supabase
+    .from("attendance_sessions")
+    .select("id")
+    .eq("id", sessionId)
+    .single();
   if (!session) {
     res.status(404).json({ error: "Session not found" });
     return;
   }
 
   try {
-    await AttendanceRecordModel.deleteMany({ sessionId });
-    await AttendanceSessionModel.deleteOne({ id: sessionId });
+    await supabase.from("attendance_records").delete().eq("sessionId", sessionId);
+    await supabase.from("attendance_sessions").delete().eq("id", sessionId);
     res.json({ message: "Attendance session deleted successfully" });
   } catch (err: any) {
     console.error("Failed to delete attendance session:", err?.message ?? err);
@@ -269,15 +342,22 @@ router.get("/attendance/my-summary", async (req, res) => {
     return;
   }
 
-  const totalSessions = await AttendanceSessionModel.countDocuments();
-  const myRecords = await AttendanceRecordModel.find({ userId: req.user.id });
+  const { count: totalSessions } = await supabase
+    .from("attendance_sessions")
+    .select("id", { count: "exact", head: true });
 
-  const attended = myRecords.filter((r) => r.status === "present").length;
-  const absent = myRecords.filter((r) => r.status === "absent").length;
-  const absentExcused = myRecords.filter((r) => r.status === "absent" && r.excuse === true).length;
-  const absentUnexcused = myRecords.filter((r) => r.status === "absent" && (!r.excuse || r.excuse === false)).length;
-  const withoutGear = myRecords.filter((r) => r.hasGear === false).length;
-  const total = totalSessions;
+  const { data: myRecords } = await supabase
+    .from("attendance_records")
+    .select("*")
+    .eq("userId", req.user.id);
+
+  const records = myRecords || [];
+  const attended = records.filter((r) => r.status === "present").length;
+  const absent = records.filter((r) => r.status === "absent").length;
+  const absentExcused = records.filter((r) => r.status === "absent" && r.excuse === true).length;
+  const absentUnexcused = records.filter((r) => r.status === "absent" && (!r.excuse || r.excuse === false)).length;
+  const withoutGear = records.filter((r) => r.hasGear === false).length;
+  const total = totalSessions || 0;
 
   res.json({
     totalSessions: total,

@@ -11,11 +11,8 @@ if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath });
 }
 
-import mongoose from "mongoose";
-import { CalendarEventModel } from "@workspace/db";
+import { supabase } from "@workspace/db";
 import { randomUUID } from "crypto";
-
-const databaseUrl = process.env.DATABASE_URL || "mongodb://localhost:27017/scout-organizer";
 
 const events = [
   { title: "A فرقة اجتماعات", date: "15/6 - 22/6 - 6/7 - 13/7", time: "Monday 5:30PM-9:00PM", place: "المرص الجديدة البطريركية الفرير (الكنيسة)" },
@@ -33,18 +30,17 @@ const events = [
 
 async function seed() {
   try {
-    await mongoose.connect(databaseUrl);
-    console.log("Connected to MongoDB");
+    const { count: existing } = await supabase
+      .from("calendar_events")
+      .select("id", { count: "exact", head: true });
 
-    const existing = await CalendarEventModel.countDocuments();
-    if (existing > 0) {
+    if (existing && existing > 0) {
       console.log(`Calendar already has ${existing} events. Skipping seed.`);
-      await mongoose.disconnect();
       return;
     }
 
     for (const event of events) {
-      await CalendarEventModel.create({
+      await supabase.from("calendar_events").insert({
         id: randomUUID(),
         title: event.title,
         date: event.date,
@@ -57,7 +53,6 @@ async function seed() {
     }
 
     console.log("Calendar seeded successfully!");
-    await mongoose.disconnect();
   } catch (err) {
     console.error("Seed failed:", err);
     process.exit(1);

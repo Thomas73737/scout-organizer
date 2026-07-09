@@ -1,10 +1,11 @@
-import express, { Router } from "express";
-import { UserModel, ScoutProfileModel } from "@workspace/db";
-import { UpdateUserRoleBody } from "@workspace/api-zod";
+import { Router } from "express";
 import { randomUUID } from "crypto";
+import { supabase } from "@workspace/db";
+import { UpdateUserRoleBody } from "@workspace/api-zod";
 import { createSession } from "../lib/auth";
 import { hashPassword, verifyPassword } from "../lib/password";
 import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
+import express from "express";
 import * as path from "path";
 import * as fs from "fs";
 
@@ -13,17 +14,28 @@ const objectStorage = new ObjectStorageService();
 const router = Router();
 
 async function ensureProfile(userId: string) {
-  const existing = await ScoutProfileModel.findOne({ userId });
-  if (!existing) {
-    await ScoutProfileModel.create({ id: randomUUID(), userId, role: "scout" });
+  const { data } = await supabase
+    .from("scout_profiles")
+    .select("id")
+    .eq("userId", userId)
+    .single();
+  if (!data) {
+    await supabase.from("scout_profiles").insert({
+      id: randomUUID(),
+      userId,
+      role: "scout",
+    });
   }
 }
 
 async function getUserWithRole(userId: string) {
-  const [user, profile] = await Promise.all([
-    UserModel.findOne({ id: userId }),
-    ScoutProfileModel.findOne({ userId }),
+  const [userResult, profileResult] = await Promise.all([
+    supabase.from("users").select("*").eq("id", userId).single(),
+    supabase.from("scout_profiles").select("*").eq("userId", userId).single(),
   ]);
+
+  const user = userResult.data;
+  const profile = profileResult.data;
 
   if (!user || !profile) return null;
 
@@ -47,13 +59,21 @@ async function getUserWithRole(userId: string) {
 }
 
 async function isDeveloperOrLeader(userId: string): Promise<boolean> {
-  const profile = await ScoutProfileModel.findOne({ userId });
-  return profile?.role === "developer" || profile?.role === "leader" || profile?.role === "cp_of_cps";
+  const { data } = await supabase
+    .from("scout_profiles")
+    .select("role")
+    .eq("userId", userId)
+    .single();
+  return data?.role === "developer" || data?.role === "leader" || data?.role === "cp_of_cps";
 }
 
 async function isDeveloper(userId: string): Promise<boolean> {
-  const profile = await ScoutProfileModel.findOne({ userId });
-  return profile?.role === "developer";
+  const { data } = await supabase
+    .from("scout_profiles")
+    .select("role")
+    .eq("userId", userId)
+    .single();
+  return data?.role === "developer";
 }
 
 // Update profile image for the authenticated user
@@ -71,15 +91,20 @@ router.post("/users/me/profile-image", async (req, res) => {
   }
 
   try {
-    const user = await UserModel.findOne({ id: req.user.id });
+    const { data: user } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", req.user.id)
+      .single();
     if (!user) {
       res.status(404).json({ error: "User not found" });
       return;
     }
 
-    user.profileImageUrl = profileImageUrl;
-    user.updatedAt = new Date();
-    await user.save();
+    await supabase
+      .from("users")
+      .update({ profileImageUrl, updatedAt: new Date().toISOString() })
+      .eq("id", req.user.id);
 
     res.json({ message: "Profile image updated successfully", profileImageUrl });
   } catch (err: any) {
@@ -133,14 +158,19 @@ router.post("/users/me/profile-image/upload",
     const imageUrl = `/api/storage/objects/uploads/${fileName}`;
 
     try {
-      const user = await UserModel.findOne({ id: req.user.id });
+      const { data: user } = await supabase
+        .from("users")
+        .select("id")
+        .eq("id", req.user.id)
+        .single();
       if (!user) {
         res.status(404).json({ error: "User not found" });
         return;
       }
-      user.profileImageUrl = imageUrl;
-      user.updatedAt = new Date();
-      await user.save();
+      await supabase
+        .from("users")
+        .update({ profileImageUrl: imageUrl, updatedAt: new Date().toISOString() })
+        .eq("id", req.user.id);
       res.json({ message: "Profile image updated successfully", profileImageUrl: imageUrl });
     } catch (err: any) {
       console.error("Failed to update profile image:", err?.message ?? err);
@@ -157,16 +187,21 @@ router.delete("/users/me/profile-image", async (req, res) => {
   }
 
   try {
-    const user = await UserModel.findOne({ id: req.user.id });
+    const { data: user } = await supabase
+      .from("users")
+      .select("id, profileImageUrl")
+      .eq("id", req.user.id)
+      .single();
     if (!user) {
       res.status(404).json({ error: "User not found" });
       return;
     }
 
     const currentUrl = user.profileImageUrl;
-    user.profileImageUrl = "";
-    user.updatedAt = new Date();
-    await user.save({ validateBeforeSave: false });
+    await supabase
+      .from("users")
+      .update({ profileImageUrl: "", updatedAt: new Date().toISOString() })
+      .eq("id", req.user.id);
 
     // Try to delete the stored file if it's a local/uploaded image
     if (currentUrl) {
@@ -214,7 +249,11 @@ router.post("/users/change-password", async (req, res) => {
   }
 
   try {
-    const user = await UserModel.findOne({ id: req.user.id });
+    const { data: user } = await supabase
+      .from("users")
+      .select("id, password")
+      .eq("id", req.user.id)
+      .single();
     if (!user) {
       res.status(404).json({ error: "User not found" });
       return;
@@ -233,9 +272,10 @@ router.post("/users/change-password", async (req, res) => {
     }
     // If user has no password (e.g. OIDC user), skip currentPassword check
 
-    user.password = hashPassword(newPassword);
-    user.updatedAt = new Date();
-    await user.save({ validateBeforeSave: false });
+    await supabase
+      .from("users")
+      .update({ password: hashPassword(newPassword), updatedAt: new Date().toISOString() })
+      .eq("id", req.user.id);
 
     res.json({ message: "Password changed successfully" });
   } catch (err: any) {
@@ -251,10 +291,23 @@ router.get("/users", async (req, res) => {
   }
   await ensureProfile(req.user.id);
 
-  const profiles = await ScoutProfileModel.find().sort({ createdAt: -1 });
+  const { data: profiles } = await supabase
+    .from("scout_profiles")
+    .select("*")
+    .order("createdAt", { ascending: false });
+
+  if (!profiles) {
+    res.json([]);
+    return;
+  }
+
   const users = await Promise.all(
     profiles.map(async (profile) => {
-      const user = await UserModel.findOne({ id: profile.userId });
+      const { data: user } = await supabase
+        .from("users")
+        .select("*")
+        .eq("id", profile.userId)
+        .single();
       return {
         id: profile.id,
         replitId: user?.id,
@@ -311,19 +364,21 @@ router.get("/users/stats", async (req, res) => {
     return;
   }
 
-  const scoutCount = await ScoutProfileModel.countDocuments({ role: "scout" });
-  const cpCount = await ScoutProfileModel.countDocuments({ role: "cp" });
-  const cpOfCpsCount = await ScoutProfileModel.countDocuments({ role: "cp_of_cps" });
-  const leaderCount = await ScoutProfileModel.countDocuments({ role: "leader" });
-  const developerCount = await ScoutProfileModel.countDocuments({ role: "developer" });
+  const [{ count: scoutCount }, { count: cpCount }, { count: cpOfCpsCount }, { count: leaderCount }, { count: developerCount }] = await Promise.all([
+    supabase.from("scout_profiles").select("*", { count: "exact", head: true }).eq("role", "scout"),
+    supabase.from("scout_profiles").select("*", { count: "exact", head: true }).eq("role", "cp"),
+    supabase.from("scout_profiles").select("*", { count: "exact", head: true }).eq("role", "cp_of_cps"),
+    supabase.from("scout_profiles").select("*", { count: "exact", head: true }).eq("role", "leader"),
+    supabase.from("scout_profiles").select("*", { count: "exact", head: true }).eq("role", "developer"),
+  ]);
 
   res.json({
-    totalScouts: scoutCount,
-    totalCp: cpCount,
-    totalCpOfCps: cpOfCpsCount,
-    totalLeaders: leaderCount,
-    totalDevelopers: developerCount,
-    totalMembers: scoutCount + cpCount + cpOfCpsCount + leaderCount + developerCount,
+    totalScouts: scoutCount || 0,
+    totalCp: cpCount || 0,
+    totalCpOfCps: cpOfCpsCount || 0,
+    totalLeaders: leaderCount || 0,
+    totalDevelopers: developerCount || 0,
+    totalMembers: (scoutCount || 0) + (cpCount || 0) + (cpOfCpsCount || 0) + (leaderCount || 0) + (developerCount || 0),
   });
 });
 
@@ -346,7 +401,11 @@ router.patch("/users/:userId/role", async (req, res) => {
   }
 
   const targetUserId = req.params.userId;
-  const targetUser = await UserModel.findOne({ id: targetUserId });
+  const { data: targetUser } = await supabase
+    .from("users")
+    .select("id")
+    .eq("id", targetUserId)
+    .single();
 
   if (!targetUser) {
     res.status(404).json({ error: "User not found" });
@@ -354,10 +413,10 @@ router.patch("/users/:userId/role", async (req, res) => {
   }
 
   await ensureProfile(targetUserId);
-  await ScoutProfileModel.findOneAndUpdate(
-    { userId: targetUserId },
-    { role: parsed.data.role }
-  );
+  await supabase
+    .from("scout_profiles")
+    .update({ role: parsed.data.role })
+    .eq("userId", targetUserId);
 
   const updated = await getUserWithRole(targetUserId);
   res.json(updated);
@@ -389,16 +448,21 @@ router.patch("/users/:userId/patrol", async (req, res) => {
   }
 
   const targetUserId = req.params.userId;
-  const targetUser = await UserModel.findOne({ id: targetUserId });
+  const { data: targetUser } = await supabase
+    .from("users")
+    .select("id")
+    .eq("id", targetUserId)
+    .single();
 
   if (!targetUser) {
     res.status(404).json({ error: "User not found" });
     return;
   }
 
-  targetUser.patrol = patrol as typeof targetUser.patrol;
-  targetUser.updatedAt = new Date();
-  await targetUser.save();
+  await supabase
+    .from("users")
+    .update({ patrol, updatedAt: new Date().toISOString() })
+    .eq("id", targetUserId);
 
   const updated = await getUserWithRole(targetUserId);
   res.json(updated);
@@ -421,9 +485,19 @@ router.post("/users/login", async (req, res) => {
 
   try {
     // Find user by email or phone
-    let user = await UserModel.findOne({ email: trimmedEmail });
+    let { data: user } = await supabase
+      .from("users")
+      .select("*")
+      .eq("email", trimmedEmail)
+      .single();
+
     if (!user) {
-      user = await UserModel.findOne({ phone: trimmedEmail });
+      const { data: phoneUser } = await supabase
+        .from("users")
+        .select("*")
+        .eq("phone", trimmedEmail)
+        .single();
+      user = phoneUser;
     }
 
     if (!user) {
@@ -437,7 +511,7 @@ router.post("/users/login", async (req, res) => {
       return;
     }
 
-    // Check user status - treat undefined as approved for backward compatibility
+    // Check user status
     if (user.status === "pending") {
       res.status(403).json({ 
         error: "Your account is pending approval. Please wait for an admin to approve your request.",
@@ -464,14 +538,15 @@ router.post("/users/login", async (req, res) => {
 
     // If status is undefined or not set, treat as approved
     if (!user.status) {
-      // Auto-approve users with undefined status for backward compatibility
-      user.status = "approved";
-      await user.save();
+      await supabase
+        .from("users")
+        .update({ status: "approved" })
+        .eq("id", user.id);
     }
 
     // Ensure user has a profile
-    await ensureProfile(user.id!);
-    const profile = await getUserWithRole(user.id!);
+    await ensureProfile(user.id);
+    const profile = await getUserWithRole(user.id);
     
     if (!profile) {
       res.status(404).json({ error: "Profile not found" });
@@ -488,7 +563,6 @@ router.post("/users/login", async (req, res) => {
         profileImageUrl: user.profileImageUrl || null,
       },
       access_token: "mock_token_" + randomUUID(),
-      // Don't set expires_at for form-based auth (let DB TTL handle it)
     };
 
     const sid = await createSession(sessionData);
@@ -499,7 +573,7 @@ router.post("/users/login", async (req, res) => {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     res.json({
@@ -528,12 +602,11 @@ router.post("/users/create-admin", async (req, res) => {
 
   try {
     // Check if admin already exists
-    const existingAdmin = await UserModel.findOne({ 
-      $or: [
-        { firstName: name },
-        { email: email }
-      ]
-    });
+    const { data: existingAdmin } = await supabase
+      .from("users")
+      .select("id")
+      .or(`firstName.eq.${name},email.eq.${email}`)
+      .maybeSingle();
 
     if (existingAdmin) {
       res.status(400).json({ error: "Admin account already exists" });
@@ -542,20 +615,20 @@ router.post("/users/create-admin", async (req, res) => {
 
     // Create admin user
     const adminUserId = randomUUID();
-    const adminUser = await UserModel.create({
+    await supabase.from("users").insert({
       id: adminUserId,
       firstName: name,
       lastName: "Admin",
-      email: email,
+      email,
       password: hashPassword(password),
-      phone: "0000000000", // Temporary phone number
-      section: "كشافة", // Default section
-      team: "A", // Default team
+      phone: "0000000000",
+      section: "كشافة",
+      team: "A",
       status: "approved",
     });
 
     // Create admin profile with leader role
-    await ScoutProfileModel.create({
+    await supabase.from("scout_profiles").insert({
       id: randomUUID(),
       userId: adminUserId,
       role: "leader",
@@ -588,7 +661,11 @@ router.post("/users/check-status", async (req, res) => {
   const trimmedEmail = email.trim();
 
   try {
-    const user = await UserModel.findOne({ email: trimmedEmail });
+    const { data: user } = await supabase
+      .from("users")
+      .select("status, email, firstName, lastName")
+      .eq("email", trimmedEmail)
+      .single();
     
     if (!user) {
       res.status(404).json({ error: "User not found", status: "not_found" });
@@ -620,9 +697,7 @@ router.post("/users/ban", async (req, res) => {
     return;
   }
 
-  const { userId } = req.body as {
-    userId?: string;
-  };
+  const { userId } = req.body as { userId?: string };
 
   if (!userId) {
     res.status(400).json({ error: "userId is required" });
@@ -630,14 +705,20 @@ router.post("/users/ban", async (req, res) => {
   }
 
   try {
-    const user = await UserModel.findOne({ id: userId });
+    const { data: user } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", userId)
+      .single();
     if (!user) {
       res.status(404).json({ error: "User not found" });
       return;
     }
 
-    user.status = "banned";
-    await user.save();
+    await supabase
+      .from("users")
+      .update({ status: "banned" })
+      .eq("id", userId);
 
     console.log(`User ${userId} banned by ${req.user.id}`);
     res.json({ message: "User banned successfully", userId: user.id });
@@ -676,14 +757,20 @@ router.post("/users/change-role", async (req, res) => {
   }
 
   try {
-    const profile = await ScoutProfileModel.findOne({ userId });
+    const { data: profile } = await supabase
+      .from("scout_profiles")
+      .select("id")
+      .eq("userId", userId)
+      .single();
     if (!profile) {
       res.status(404).json({ error: "User profile not found" });
       return;
     }
 
-    profile.role = newRole as any;
-    await profile.save();
+    await supabase
+      .from("scout_profiles")
+      .update({ role: newRole })
+      .eq("userId", userId);
 
     console.log(`User ${userId} role changed to ${newRole} by ${req.user.id}`);
     res.json({ message: "User role changed successfully", userId, newRole });
@@ -706,9 +793,7 @@ router.post("/users/unban", async (req, res) => {
     return;
   }
 
-  const { userId } = req.body as {
-    userId?: string;
-  };
+  const { userId } = req.body as { userId?: string };
 
   if (!userId) {
     res.status(400).json({ error: "userId is required" });
@@ -716,14 +801,20 @@ router.post("/users/unban", async (req, res) => {
   }
 
   try {
-    const user = await UserModel.findOne({ id: userId });
+    const { data: user } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", userId)
+      .single();
     if (!user) {
       res.status(404).json({ error: "User not found" });
       return;
     }
 
-    user.status = "approved";
-    await user.save();
+    await supabase
+      .from("users")
+      .update({ status: "approved" })
+      .eq("id", userId);
 
     console.log(`User ${userId} unbanned by ${req.user.id}`);
     res.json({ message: "User unbanned successfully", userId: user.id });
@@ -755,17 +846,21 @@ router.delete("/users/:userId", async (req, res) => {
   }
 
   try {
-    const user = await UserModel.findOne({ id: targetUserId });
+    const { data: user } = await supabase
+      .from("users")
+      .select("id")
+      .eq("id", targetUserId)
+      .single();
     if (!user) {
       res.status(404).json({ error: "User not found" });
       return;
     }
 
     // Delete user profile
-    await ScoutProfileModel.deleteOne({ userId: targetUserId });
+    await supabase.from("scout_profiles").delete().eq("userId", targetUserId);
 
     // Delete user account
-    await UserModel.deleteOne({ id: targetUserId });
+    await supabase.from("users").delete().eq("id", targetUserId);
 
     console.log(`User ${targetUserId} deleted by developer ${req.user.id}`);
     res.json({ message: "User deleted successfully", userId: targetUserId });
@@ -788,16 +883,21 @@ router.post("/users/update-admin-password", async (req, res) => {
   }
 
   try {
-    const user = await UserModel.findOne({ email: email });
+    const { data: user } = await supabase
+      .from("users")
+      .select("id")
+      .eq("email", email)
+      .single();
     
     if (!user) {
       res.status(404).json({ error: "User not found" });
       return;
     }
 
-    user.password = hashPassword(newPassword);
-    user.updatedAt = new Date();
-    await user.save({ validateBeforeSave: false });
+    await supabase
+      .from("users")
+      .update({ password: hashPassword(newPassword), updatedAt: new Date().toISOString() })
+      .eq("id", user.id);
 
     console.log(`Password updated for user: ${email}`);
     res.json({ message: "Password updated successfully", email: email });

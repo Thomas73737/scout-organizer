@@ -2,8 +2,8 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-// Load .env from project root
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const projectRoot = path.resolve(__dirname, "../../..");
@@ -13,67 +13,24 @@ if (fs.existsSync(envPath)) {
   dotenv.config({ path: envPath });
 }
 
-import mongoose from "mongoose";
-import {
-  UserModel,
-  SessionModel,
-  ScoutProfileModel,
-  AttendanceSessionModel,
-  AttendanceRecordModel,
-  AnnouncementModel,
-  PostModel,
-  AccessRequestModel,
-} from "./schema";
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
 
-// Use local MongoDB or provide a default for development
-const databaseUrl = process.env.DATABASE_URL || 'mongodb://localhost:27017/scout-organizer';
-
-if (!process.env.DATABASE_URL) {
-  console.log("DATABASE_URL not set, using default:", databaseUrl);
+if (!supabaseUrl || !supabaseServiceKey) {
+  throw new Error("SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in environment variables");
 }
 
-// Connect to MongoDB
+export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: { persistSession: false },
+});
+
+// No-op connectDB for backward compatibility (Supabase client connects on demand)
 export async function connectDB() {
-  try {
-    await mongoose.connect(databaseUrl);
-    console.log("Connected to MongoDB");
-  } catch (error) {
-    console.error("Failed to connect to MongoDB:", error);
-    throw error;
-  }
+  console.log("Supabase client initialized (no persistent connection needed)");
 }
 
-// Export schema models and types
-export * from "./schema";
+// Re-export types
+export * from "./types";
 
-// Drizzle-like API compatibility layer
-export const db = {
-  select: () => ({
-    from: (model: any) => ({
-      where: (condition: any) => ({
-        limit: () => Promise.resolve([]),
-      }),
-    }),
-  }),
-  insert: (model: any) => ({
-    values: (data: any) => Promise.resolve({}),
-  }),
-  update: (model: any) => ({
-    set: (data: any) => ({
-      where: (condition: any) => Promise.resolve({}),
-    }),
-  }),
-  delete: (model: any) => ({
-    where: (condition: any) => Promise.resolve({}),
-  }),
-} as any;
-
-// Export models as table-like references for backward compatibility
-export const usersTable = UserModel;
-export const sessionsTable = SessionModel;
-export const scoutProfilesTable = ScoutProfileModel;
-export const attendanceSessionsTable = AttendanceSessionModel;
-export const attendanceRecordsTable = AttendanceRecordModel;
-export const announcementsTable = AnnouncementModel;
-export const postsTable = PostModel;
-export const accessRequestsTable = AccessRequestModel;
+// Re-export supabase for direct use
+export { supabase as db };

@@ -1,11 +1,16 @@
 import { Router } from "express";
-import { UserModel, ScoutProfileModel, mainBadgeEnum, proficiencyBadgeEnum, hobbyBadgeEnum } from "@workspace/db";
+import { supabase } from "@workspace/db";
+import { mainBadgeEnum, proficiencyBadgeEnum, hobbyBadgeEnum } from "@workspace/db/types";
 
 const router = Router();
 
 async function isDeveloperOrLeader(userId: string): Promise<boolean> {
-  const profile = await ScoutProfileModel.findOne({ userId });
-  return profile?.role === "developer" || profile?.role === "leader" || profile?.role === "cp_of_cps";
+  const { data } = await supabase
+    .from("scout_profiles")
+    .select("role")
+    .eq("userId", userId)
+    .single();
+  return data?.role === "developer" || data?.role === "leader" || data?.role === "cp_of_cps";
 }
 
 // GET /api/badges/:userId - Get a user's badges (public)
@@ -15,7 +20,11 @@ router.get("/badges/:userId", async (req, res) => {
     return;
   }
 
-  const user = await UserModel.findOne({ id: req.params.userId });
+  const { data: user } = await supabase
+    .from("users")
+    .select("mainBadge, proficiencyBadges, hobbyBadges")
+    .eq("id", req.params.userId)
+    .single();
   if (!user) {
     res.status(404).json({ error: "User not found" });
     return;
@@ -47,17 +56,22 @@ router.put("/badges/:userId/main-badge", async (req, res) => {
     return;
   }
 
-  const user = await UserModel.findOne({ id: req.params.userId });
+  const { data: user } = await supabase
+    .from("users")
+    .select("id")
+    .eq("id", req.params.userId)
+    .single();
   if (!user) {
     res.status(404).json({ error: "User not found" });
     return;
   }
 
-  user.mainBadge = badge as typeof mainBadgeEnum[number];
-  user.updatedAt = new Date();
-  await user.save();
+  await supabase
+    .from("users")
+    .update({ mainBadge: badge, updatedAt: new Date().toISOString() })
+    .eq("id", req.params.userId);
 
-  res.json({ mainBadge: user.mainBadge });
+  res.json({ mainBadge: badge });
 });
 
 // DELETE /api/badges/:userId/main-badge - Remove main badge (admin only)
@@ -73,15 +87,20 @@ router.delete("/badges/:userId/main-badge", async (req, res) => {
     return;
   }
 
-  const user = await UserModel.findOne({ id: req.params.userId });
+  const { data: user } = await supabase
+    .from("users")
+    .select("id")
+    .eq("id", req.params.userId)
+    .single();
   if (!user) {
     res.status(404).json({ error: "User not found" });
     return;
   }
 
-  user.mainBadge = null;
-  user.updatedAt = new Date();
-  await user.save();
+  await supabase
+    .from("users")
+    .update({ mainBadge: null, updatedAt: new Date().toISOString() })
+    .eq("id", req.params.userId);
 
   res.json({ mainBadge: null });
 });
@@ -105,23 +124,29 @@ router.post("/badges/:userId/proficiency", async (req, res) => {
     return;
   }
 
-  const user = await UserModel.findOne({ id: req.params.userId });
+  const { data: user } = await supabase
+    .from("users")
+    .select("id, proficiencyBadges")
+    .eq("id", req.params.userId)
+    .single();
   if (!user) {
     res.status(404).json({ error: "User not found" });
     return;
   }
 
-  if (!user.proficiencyBadges) user.proficiencyBadges = [];
-  if (user.proficiencyBadges.includes(badge as any)) {
+  const currentBadges = user.proficiencyBadges || [];
+  if (currentBadges.includes(badge as any)) {
     res.status(400).json({ error: "Badge already assigned" });
     return;
   }
 
-  user.proficiencyBadges.push(badge as typeof proficiencyBadgeEnum[number]);
-  user.updatedAt = new Date();
-  await user.save();
+  const updatedBadges = [...currentBadges, badge];
+  await supabase
+    .from("users")
+    .update({ proficiencyBadges: updatedBadges, updatedAt: new Date().toISOString() })
+    .eq("id", req.params.userId);
 
-  res.json({ proficiencyBadges: user.proficiencyBadges });
+  res.json({ proficiencyBadges: updatedBadges });
 });
 
 // DELETE /api/badges/:userId/proficiency/:badgeName - Remove proficiency badge (admin only)
@@ -138,17 +163,23 @@ router.delete("/badges/:userId/proficiency/:badgeName", async (req, res) => {
   }
 
   const badgeName = decodeURIComponent(req.params.badgeName);
-  const user = await UserModel.findOne({ id: req.params.userId });
+  const { data: user } = await supabase
+    .from("users")
+    .select("id, proficiencyBadges")
+    .eq("id", req.params.userId)
+    .single();
   if (!user) {
     res.status(404).json({ error: "User not found" });
     return;
   }
 
-  user.proficiencyBadges = (user.proficiencyBadges || []).filter((b) => b !== badgeName);
-  user.updatedAt = new Date();
-  await user.save();
+  const updatedBadges = (user.proficiencyBadges || []).filter((b: string) => b !== badgeName);
+  await supabase
+    .from("users")
+    .update({ proficiencyBadges: updatedBadges, updatedAt: new Date().toISOString() })
+    .eq("id", req.params.userId);
 
-  res.json({ proficiencyBadges: user.proficiencyBadges });
+  res.json({ proficiencyBadges: updatedBadges });
 });
 
 // POST /api/badges/:userId/hobby - Add hobby badge (admin only)
@@ -170,23 +201,29 @@ router.post("/badges/:userId/hobby", async (req, res) => {
     return;
   }
 
-  const user = await UserModel.findOne({ id: req.params.userId });
+  const { data: user } = await supabase
+    .from("users")
+    .select("id, hobbyBadges")
+    .eq("id", req.params.userId)
+    .single();
   if (!user) {
     res.status(404).json({ error: "User not found" });
     return;
   }
 
-  if (!user.hobbyBadges) user.hobbyBadges = [];
-  if (user.hobbyBadges.includes(badge as any)) {
+  const currentBadges = user.hobbyBadges || [];
+  if (currentBadges.includes(badge as any)) {
     res.status(400).json({ error: "Badge already assigned" });
     return;
   }
 
-  user.hobbyBadges.push(badge as typeof hobbyBadgeEnum[number]);
-  user.updatedAt = new Date();
-  await user.save();
+  const updatedBadges = [...currentBadges, badge];
+  await supabase
+    .from("users")
+    .update({ hobbyBadges: updatedBadges, updatedAt: new Date().toISOString() })
+    .eq("id", req.params.userId);
 
-  res.json({ hobbyBadges: user.hobbyBadges });
+  res.json({ hobbyBadges: updatedBadges });
 });
 
 // DELETE /api/badges/:userId/hobby/:badgeName - Remove hobby badge (admin only)
@@ -203,17 +240,23 @@ router.delete("/badges/:userId/hobby/:badgeName", async (req, res) => {
   }
 
   const badgeName = decodeURIComponent(req.params.badgeName);
-  const user = await UserModel.findOne({ id: req.params.userId });
+  const { data: user } = await supabase
+    .from("users")
+    .select("id, hobbyBadges")
+    .eq("id", req.params.userId)
+    .single();
   if (!user) {
     res.status(404).json({ error: "User not found" });
     return;
   }
 
-  user.hobbyBadges = (user.hobbyBadges || []).filter((b) => b !== badgeName);
-  user.updatedAt = new Date();
-  await user.save();
+  const updatedBadges = (user.hobbyBadges || []).filter((b: string) => b !== badgeName);
+  await supabase
+    .from("users")
+    .update({ hobbyBadges: updatedBadges, updatedAt: new Date().toISOString() })
+    .eq("id", req.params.userId);
 
-  res.json({ hobbyBadges: user.hobbyBadges });
+  res.json({ hobbyBadges: updatedBadges });
 });
 
 export default router;
