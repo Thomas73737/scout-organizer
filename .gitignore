@@ -51,5 +51,8 @@ Thumbs.db
 # Local storage for development
 local-storage/
 
+# Vercel build output
+public/
+
 # Environment variables
 .env
