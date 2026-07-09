@@ -115,7 +115,7 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Expres
       return;
     }
 
-    const response = await objectStorageService.downloadObject(file);
+    const response: any = await objectStorageService.downloadObject(file);
 
     res.status(response.status);
     response.headers.forEach((value, key) => res.setHeader(key, value));
@@ -131,6 +131,8 @@ router.get("/storage/public-objects/*filePath", async (req: Request, res: Expres
     res.status(500).json({ error: "Failed to serve public object" });
   }
 });
+
+router.get("/storage/objects/*path", async (req: Request, res: ExpressResponse) => {
 
 /**
  * GET /storage/objects/*
@@ -161,7 +163,7 @@ router.get("/storage/objects/*path", async (req: Request, res: ExpressResponse) 
     //   return;
     // }
 
-    const response = await objectStorageService.downloadObject(objectFile);
+    const response: any = await objectStorageService.downloadObject(objectFile);
 
     res.status(response.status);
     response.headers.forEach((value, key) => res.setHeader(key, value));
