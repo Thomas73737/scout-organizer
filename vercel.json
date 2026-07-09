@@ -1,7 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "pnpm install --no-frozen-lockfile",
-  "buildCommand": "pnpm --filter @workspace/scouts-web run build && cp -r artifacts/scouts-web/dist/public/. public/",
+  "buildCommand": "pnpm --filter @workspace/scouts-web run build",
   "rewrites": [
     {
       "source": "/api/(.*)",
