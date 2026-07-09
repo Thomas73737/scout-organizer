@@ -10,7 +10,7 @@ async function ensureConnection() {
   }
 }
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req, res) {
   try {
     await ensureConnection();
     app(req, res);
