@@ -1,5 +1,5 @@
 import { connectDB } from "@workspace/db";
-import app from "../artifacts/api-server/src/app";
+import app from "../artifacts/api-server/dist/index.mjs";
 
 let initialized = false;
 
