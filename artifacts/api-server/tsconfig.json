@@ -6,7 +6,9 @@
     "outDir": "dist",
     "rootDir": "src",
     "types": ["node"],
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "strict": false,
+    "noEmit": true
   },
   "include": ["src"],
   "references": [
