@@ -3,13 +3,14 @@
   "installCommand": "pnpm install --no-frozen-lockfile",
   "buildCommand": "pnpm --filter @workspace/api-server run build && pnpm --filter @workspace/scouts-web run build",
   "outputDirectory": "dist",
+  "cleanUrls": true,
   "rewrites": [
     {
       "source": "/api/(.*)",
       "destination": "/api"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!assets/|favicon|robots.txt|robots|service-worker|sw.js|manifest).*)",
       "destination": "/index.html"
     }
   ],
