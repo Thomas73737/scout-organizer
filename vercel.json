@@ -1,24 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "installCommand": "pnpm install --no-frozen-lockfile",
-  "buildCommand": "pnpm --filter @workspace/api-server run build && pnpm --filter @workspace/scouts-web run build",
+  "buildCommand": "pnpm --filter @workspace/scouts-web run build",
   "outputDirectory": "dist",
-  "cleanUrls": true,
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api"
-    },
-    {
-      "source": "/((?!assets/|favicon|robots.txt|robots|service-worker|sw.js|manifest).*)",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
-  ],
-  "functions": {
-    "api/index.mjs": {
-      "memory": 512,
-      "maxDuration": 30,
-      "includeFiles": "artifacts/api-server/dist/**"
-    }
-  }
+  ]
 }
