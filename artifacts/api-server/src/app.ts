@@ -37,4 +37,12 @@ app.use(authMiddleware);
 
 app.use("/api", router);
 
+// Global error-handling middleware — must have 4 parameters for Express to treat it as an error handler
+app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  logger.error({ err }, "Unhandled error");
+  if (!res.headersSent) {
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 export default app;

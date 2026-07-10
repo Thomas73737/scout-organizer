@@ -9,6 +9,8 @@ export const logger = pino({
     "req.headers.cookie",
     "res.headers['set-cookie']",
   ],
+  // In production (Vercel/serverless), write synchronously to stdout
+  // without worker threads. Transports (pino-pretty) are dev-only.
   ...(isProduction
     ? {}
     : {
