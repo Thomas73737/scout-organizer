@@ -1,4 +1,4 @@
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   try {
     const { default: app } = await import("../artifacts/api-server/dist/index.mjs");
     app(req, res);
@@ -8,4 +8,4 @@ module.exports = async function handler(req, res) {
     res.setHeader("Content-Type", "application/json");
     res.end(JSON.stringify({ error: err?.message || "Internal error" }));
   }
-};
+}

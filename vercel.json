@@ -4,13 +4,17 @@
   "buildCommand": "pnpm --filter @workspace/api-server run build && pnpm --filter @workspace/scouts-web run build",
   "outputDirectory": "dist",
   "functions": {
-    "api/index.js": {
+    "api/index.mjs": {
       "memory": 512,
       "maxDuration": 30,
       "includeFiles": "artifacts/api-server/dist/**"
     }
   },
   "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "/api/index"
+    },
     {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
