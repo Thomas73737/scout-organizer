@@ -3,24 +3,14 @@
   "installCommand": "pnpm install --no-frozen-lockfile",
   "buildCommand": "pnpm --filter @workspace/api-server run build && pnpm --filter @workspace/scouts-web run build",
   "outputDirectory": "dist",
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/index.mjs"
+      "source": "/api/:path*",
+      "destination": "/api/index.mjs"
     },
     {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
     }
-  ],
-  "functions": {
-    "api/index.mjs": {
-      "memory": 512,
-      "maxDuration": 30,
-      "includeFiles": "artifacts/api-server/dist/**"
-    }
-  }
+  ]
 }
