@@ -53,8 +53,6 @@ local-storage/
 
 # Vercel build output
 public/
-api/index.mjs
-api/index.js
 
 # Environment variables
 .env
