@@ -14,23 +14,15 @@ async function buildAll() {
 
   if (isVercel) {
     const apiDir = path.resolve(projectRoot, "api");
-    const target = path.resolve(apiDir, "index.mjs");
-    try { await rm(target); } catch {}
+    try { await rm(path.resolve(apiDir, "index.mjs")); } catch {}
+    try { await rm(path.resolve(apiDir, "index.js")); } catch {}
   }
 
-  await esbuild({
+  const commonOpts = {
     entryPoints: [path.resolve(artifactDir, "src/index.ts")],
     platform: "node",
     bundle: true,
-    format: "esm",
-    outdir: isVercel ? path.resolve(projectRoot, "api") : distDir,
-    outExtension: isVercel ? {} : { ".js": ".mjs" },
     logLevel: "info",
-    // Some packages may not be bundleable, so we externalize them, we can add more here as needed.
-    // Some of the packages below may not be imported or installed, but we're adding them in case they are in the future.
-    // Examples of unbundleable packages:
-    // - uses native modules and loads them dynamically (e.g. sharp)
-    // - use path traversal to read files (e.g. @google-cloud/secret-manager loads sibling .proto files)
     external: [
       "*.node",
       "sharp",
@@ -109,9 +101,22 @@ async function buildAll() {
     ],
     sourcemap: false,
     plugins: [],
-    // Make sure packages that are cjs only (e.g. express) but are bundled continue to work in our esm output file
-    banner: {
-      js: `import { createRequire as __bannerCrReq } from 'node:module';
+  };
+
+  if (isVercel) {
+    await esbuild({
+      ...commonOpts,
+      format: "cjs",
+      outfile: path.resolve(projectRoot, "api/index.js"),
+    });
+  } else {
+    await esbuild({
+      ...commonOpts,
+      format: "esm",
+      outdir: distDir,
+      outExtension: { ".js": ".mjs" },
+      banner: {
+        js: `import { createRequire as __bannerCrReq } from 'node:module';
 import __bannerPath from 'node:path';
 import __bannerUrl from 'node:url';
 
@@ -119,8 +124,9 @@ globalThis.require = __bannerCrReq(import.meta.url);
 globalThis.__filename = __bannerUrl.fileURLToPath(import.meta.url);
 globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     `,
-    },
-  });
+      },
+    });
+  }
 }
 
 buildAll().catch((err) => {
