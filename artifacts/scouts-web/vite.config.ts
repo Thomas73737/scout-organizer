@@ -48,7 +48,9 @@ export default defineConfig(async ({ mode }) => {
   },
   root: path.resolve(__dirname),
   build: {
-    outDir: path.resolve(__dirname, "..", "..", "dist"),
+    outDir: process.env.VERCEL
+      ? path.resolve(__dirname, "dist")
+      : path.resolve(__dirname, "..", "..", "dist"),
     emptyOutDir: true,
   },
   server: {
