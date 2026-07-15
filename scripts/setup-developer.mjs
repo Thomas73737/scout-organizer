@@ -2,6 +2,7 @@ import { MongoClient } from "mongodb";
 import { randomUUID } from "crypto";
 
 const DATABASE_URL = process.env.DATABASE_URL || "mongodb://localhost:27017/scout-organizer";
+const DEVELOPER_PASSWORD = process.env.DEVELOPER_PASSWORD || "CHANGE_ME";
 
 async function setupDeveloper() {
   let client;
@@ -13,12 +14,11 @@ async function setupDeveloper() {
 
     const db = client.db();
 
-    // Clear all collections
     console.log("\n=== CLEARING DATABASE ===");
-    
+
     const collections = [
       "users",
-      "scoutprofiles", 
+      "scoutprofiles",
       "posts",
       "announcements",
       "attendancesessions",
@@ -27,31 +27,29 @@ async function setupDeveloper() {
 
     for (const collectionName of collections) {
       const result = await db.collection(collectionName).deleteMany({});
-      console.log(`✅ Cleared ${collectionName}: ${result.deletedCount} documents`);
+      console.log(`Cleared ${collectionName}: ${result.deletedCount} documents`);
     }
 
-    // Create developer account
     console.log("\n=== CREATING DEVELOPER ACCOUNT ===");
-    
+
     const developerUserId = randomUUID();
-    const developerUser = await db.collection("users").insertOne({
+    await db.collection("users").insertOne({
       id: developerUserId,
-      firstName: "sofsafaSVS",
-      lastName: "Developer",
+      firstName: "Developer",
+      lastName: "User",
       email: "developer@scout.org",
-      password: "Youssef@2008", // In production, this should be hashed
-      phone: "0000000000", // Temporary phone number
-      section: "كشافة", // Default section
-      team: "A", // Default team
+      password: DEVELOPER_PASSWORD,
+      phone: "0000000000",
+      section: "كشافة",
+      team: "A",
       status: "approved",
       createdAt: new Date(),
       updatedAt: new Date(),
     });
 
-    console.log("✅ Created developer user:", developerUserId, "developer@scout.org");
+    console.log("Created developer user:", developerUserId, "developer@scout.org");
 
-    // Create developer profile with developer role
-    const developerProfile = await db.collection("scoutprofiles").insertOne({
+    await db.collection("scoutprofiles").insertOne({
       id: randomUUID(),
       userId: developerUserId,
       role: "developer",
@@ -59,15 +57,13 @@ async function setupDeveloper() {
       updatedAt: new Date(),
     });
 
-    console.log("✅ Created developer profile with role: developer");
+    console.log("Created developer profile with role: developer");
 
     console.log("\n=== SETUP COMPLETE ===");
     console.log("Developer account credentials:");
-    console.log("Name: sofsafaSVS");
     console.log("Email: developer@scout.org");
-    console.log("Password: Youssef@2008");
+    console.log("Set DEVELOPER_PASSWORD env var to the password you used");
     console.log("Role: developer");
-    console.log("\nYou can now login with these credentials.");
 
   } catch (error) {
     console.error("Error setting up developer account:", error);

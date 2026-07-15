@@ -10,24 +10,26 @@ function hashPassword(password) {
   return `${HASH_PREFIX}${salt}$${hash}`;
 }
 
+const DEFAULT_PASSWORD = process.env.ADMIN_DEFAULT_PASSWORD || "CHANGE_ME_BEFORE_RUNNING";
+
 const admins = [
-  { name: "Samer Emad", phone: "1274316373", password: "nBvtK8e5x5pY" },
-  { name: "Andrew George", phone: "1278309854", password: "Nug6B9UQVLs7" },
-  { name: "Youssef Ashraf", phone: "1277327360", password: "fBWutp5w48e6" },
-  { name: "Ramez Ashraf", phone: "1277326902", password: "xpxc9ePztAy7" },
-  { name: "Amir Kamil", phone: "1276679771", password: "ymqSNDamcApN" },
-  { name: "David Maged", phone: "1063282192", password: "qqm5pevnecJu" },
-  { name: "Paula Hakim", phone: "1200849052", password: "YuhUU3XCaC65" },
-  { name: "Youssef Ehab", phone: "1200455560", password: "kFHMRmYRXquN" },
-  { name: "George Elhamy", phone: "1283574680", password: "dVGYLKXAqvnr" },
-  { name: "Anthony Hany", phone: "1278289381", password: "NIhBHPTWgLM9" },
-  { name: "Steven George", phone: "1277515581", password: "hcYZQYgG8Nkf" },
-  { name: "Amir Ashraf", phone: "1221159696", password: "cBu3H5UdEbdq" },
-  { name: "Philopater Ghobrial", phone: "1221883485", password: "jHF5BaSKeKY6" },
-  { name: "Samir Sameh", phone: "1286818030", password: "QaQ2n6sjp4jV" },
-  { name: "Youssef Sameh", phone: "1283004494", password: "XU47zrdAPz57" },
-  { name: "Rewes Ayman", phone: "1202270659", password: "IQaTj8tmKYEW" },
-  { name: "Mina Safwat", phone: "1286727193", password: "T4UGEAyXDBIf" },
+  { name: "Samer Emad", phone: "1274316373" },
+  { name: "Andrew George", phone: "1278309854" },
+  { name: "Youssef Ashraf", phone: "1277327360" },
+  { name: "Ramez Ashraf", phone: "1277326902" },
+  { name: "Amir Kamil", phone: "1276679771" },
+  { name: "David Maged", phone: "1063282192" },
+  { name: "Paula Hakim", phone: "1200849052" },
+  { name: "Youssef Ehab", phone: "1200455560" },
+  { name: "George Elhamy", phone: "1283574680" },
+  { name: "Anthony Hany", phone: "1278289381" },
+  { name: "Steven George", phone: "1277515581" },
+  { name: "Amir Ashraf", phone: "1221159696" },
+  { name: "Philopater Ghobrial", phone: "1221883485" },
+  { name: "Samir Sameh", phone: "1286818030" },
+  { name: "Youssef Sameh", phone: "1283004494" },
+  { name: "Rewes Ayman", phone: "1202270659" },
+  { name: "Mina Safwat", phone: "1286727193" },
 ];
 
 function parseName(name) {
@@ -58,7 +60,7 @@ async function createAdmins() {
     }
 
     const userId = randomUUID();
-    const hashed = hashPassword(admin.password);
+    const hashed = hashPassword(DEFAULT_PASSWORD);
 
     await usersCol.insertOne({
       id: userId,

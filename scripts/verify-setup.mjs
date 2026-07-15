@@ -1,6 +1,7 @@
 import { MongoClient } from "mongodb";
 
 const DATABASE_URL = process.env.DATABASE_URL || "mongodb://localhost:27017/scout-organizer";
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@example.com";
 
 async function verifySetup() {
   let client;
@@ -14,7 +15,7 @@ async function verifySetup() {
     const profilesCollection = db.collection("scoutprofiles");
 
     // Check admin user
-    const adminUser = await usersCollection.findOne({ email: "thomacyshody@gmail.com" });
+    const adminUser = await usersCollection.findOne({ email: ADMIN_EMAIL });
     
     if (!adminUser) {
       console.log("❌ Admin user not found");

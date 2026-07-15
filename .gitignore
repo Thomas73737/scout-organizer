@@ -56,3 +56,11 @@ public/
 
 # Environment variables
 .env
+.env.local
+.env.*.local
+
+# Database backups (may contain sensitive data)
+db-backup/
+
+# Local storage
+local-storage/

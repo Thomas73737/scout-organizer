@@ -2,6 +2,8 @@ import { MongoClient } from "mongodb";
 import { randomUUID } from "crypto";
 
 const DATABASE_URL = process.env.DATABASE_URL || "mongodb://localhost:27017/scout-organizer";
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@example.com";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "CHANGE_ME";
 
 async function updateAdminCredentials() {
   let client;
@@ -13,35 +15,33 @@ async function updateAdminCredentials() {
     const db = client.db();
     const usersCollection = db.collection("users");
 
-    // Update admin user with new email and password
     const result = await usersCollection.updateOne(
       { phone: "1234567891011" },
-      { 
-        $set: { 
-          email: "thomacyshody@gmail.com",
-          password: "thomas500500",
+      {
+        $set: {
+          email: ADMIN_EMAIL,
+          password: ADMIN_PASSWORD,
           section: "كشافة",
           team: "A",
           status: "approved",
-          updatedAt: new Date() 
-        } 
+          updatedAt: new Date()
+        }
       }
     );
 
     if (result.matchedCount > 0) {
-      console.log("✅ Admin user credentials updated successfully");
+      console.log("Admin user credentials updated successfully");
     } else {
-      console.log("❌ Admin user not found, creating new admin user...");
-      
-      // Create new admin user if not found
+      console.log("Admin user not found, creating new admin user...");
+
       const newUserId = randomUUID();
-      
+
       await usersCollection.insertOne({
         id: newUserId,
-        firstName: "Thomas",
-        lastName: "Samir",
-        email: "thomacyshody@gmail.com",
-        password: "thomas500500",
+        firstName: "Admin",
+        lastName: "User",
+        email: ADMIN_EMAIL,
+        password: ADMIN_PASSWORD,
         phone: "1234567891011",
         section: "كشافة",
         team: "A",
@@ -49,12 +49,11 @@ async function updateAdminCredentials() {
         createdAt: new Date(),
         updatedAt: new Date(),
       });
-      
-      console.log("✅ New admin user created successfully");
+
+      console.log("New admin user created successfully");
     }
 
-    // Verify the update
-    const adminUser = await usersCollection.findOne({ email: "thomacyshody@gmail.com" });
+    const adminUser = await usersCollection.findOne({ email: ADMIN_EMAIL });
     console.log("\nUpdated admin user:", JSON.stringify(adminUser, null, 2));
 
   } catch (error) {

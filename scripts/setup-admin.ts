@@ -3,7 +3,7 @@ import crypto, { randomUUID } from "crypto";
 import { UserModel, ScoutProfileModel } from "../lib/db/src/schema";
 
 const DATABASE_URL = process.env.DATABASE_URL || "mongodb://localhost:27017/scout-organizer";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "admin123";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "CHANGE_ME_BEFORE_RUNNING";
 
 function hashPassword(password: string): string {
   const salt = crypto.randomBytes(16).toString("base64");
