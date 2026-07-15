@@ -7,11 +7,11 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "pnpm run typecheck && pnpm -r --if-present run build",
+    "build": "pnpm --filter @workspace/api-server run build && pnpm --filter @workspace/scouts-web run build",
+    "start": "pnpm --filter @workspace/api-server run start",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
-    "promote-to-leader": "node scripts/promote-to-leader.ts",
-    "vercel-build": "pnpm --filter @workspace/api-server run build && pnpm --filter @workspace/scouts-web run build"
+    "promote-to-leader": "node scripts/promote-to-leader.ts"
   },
   "private": true,
   "devDependencies": {

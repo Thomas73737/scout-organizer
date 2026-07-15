@@ -4,7 +4,6 @@ import { build as esbuild } from "esbuild";
 import { rm } from "node:fs/promises";
 
 const artifactDir = path.dirname(fileURLToPath(import.meta.url));
-const isVercel = !!process.env.VERCEL;
 
 async function buildAll() {
   const distDir = path.resolve(artifactDir, "dist");
@@ -112,13 +111,7 @@ globalThis.__dirname = __bannerPath.dirname(globalThis.__filename);
     },
   };
 
-  if (isVercel) {
-    // On Vercel: output directly to api/index.mjs (self-contained serverless function)
-    await esbuild({ ...esbuildConfig, outfile: path.resolve(artifactDir, "../../api/index.mjs") });
-  } else {
-    // Locally: output to artifacts/api-server/dist/
-    await esbuild({ ...esbuildConfig, outdir: distDir, outExtension: { ".js": ".mjs" } });
-  }
+  await esbuild({ ...esbuildConfig, outdir: distDir, outExtension: { ".js": ".mjs" } });
 }
 
 buildAll().catch((err) => {

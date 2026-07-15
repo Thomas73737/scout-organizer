@@ -1,5 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import express, { type Express } from "express";
+import path from "path";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { pinoHttp } from "pino-http";
@@ -36,6 +37,15 @@ app.use(express.urlencoded({ extended: true }));
 app.use(authMiddleware);
 
 app.use("/api", router);
+
+// Serve static frontend files from the Vite build output
+const clientDistPath = path.resolve(process.cwd(), "dist");
+app.use(express.static(clientDistPath));
+
+// SPA fallback: serve index.html for all non-API, non-static routes
+app.get("*", (_req, res) => {
+  res.sendFile(path.join(clientDistPath, "index.html"));
+});
 
 // Global error-handling middleware — must have 4 parameters for Express to treat it as an error handler
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
