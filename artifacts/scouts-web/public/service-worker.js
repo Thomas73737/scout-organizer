@@ -1,12 +1,21 @@
 self.addEventListener('push', (event) => {
   const data = event.data?.json() ?? { title: 'Notification', message: '' };
 
+  const tag = data.data?.type
+    ? `${data.data.type}-${data.data.relatedId || data.data.announcementId || data.data.messageId || 'new'}`
+    : undefined;
+
   const options = {
     body: data.message,
-    icon: data.icon || '/favicon.png',
+    icon: '/favicon.png',
     badge: '/favicon.png',
+    image: data.image || undefined,
+    tag: tag,
+    renotify: true,
+    requireInteraction: false,
+    silent: false,
+    vibrate: [300, 100, 300, 100, 300],
     data: data.data || {},
-    vibrate: [200, 100, 200],
   };
 
   event.waitUntil(

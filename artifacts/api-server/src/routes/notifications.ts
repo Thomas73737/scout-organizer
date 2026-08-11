@@ -55,4 +55,24 @@ router.post("/notifications/read-all", async (req, res) => {
   res.json({ success: true });
 });
 
+router.delete("/notifications/:id", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const { error } = await supabase
+    .from("notifications")
+    .delete()
+    .eq("id", req.params.id)
+    .eq("userId", req.user.id);
+
+  if (error) {
+    res.status(500).json({ error: "Failed to delete notification" });
+    return;
+  }
+
+  res.json({ success: true });
+});
+
 export default router;

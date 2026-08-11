@@ -9,7 +9,7 @@ import { UserCircle, Mail, Award, Target, Heart, ArrowLeft, Send } from "lucide-
 import { BadgeSection } from "@/components/badges/BadgeCard";
 
 export default function PublicProfile() {
-  const params = useParams();
+  const params = useParams<{ userId: string }>();
   const userId = params?.userId;
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -96,7 +96,7 @@ export default function PublicProfile() {
                   className="capitalize"
                   variant={profile.role === "leader" || profile.role === "developer" || profile.role === "cp_of_cps" || profile.role === "cp" ? "default" : "secondary"}
                 >
-                  {profile.role === "leader" ? "Leader / قائد" : profile.role === "developer" ? "Developer / مطور" : profile.role === "cp_of_cps" ? "CP of CPs / قائد كوربال" : profile.role === "cp" ? "CP / كوربال" : "Scout / كشاف"}
+                  {profile.role === "leader" ? "Leader" : profile.role === "developer" ? "Developer" : profile.role === "cp_of_cps" ? "CP of CPs" : profile.role === "cp" ? "CP" : "Scout"}
                 </Badge>
                 {profile.patrol && (
                   <Badge variant="outline" className="text-xs">{profile.patrol}</Badge>

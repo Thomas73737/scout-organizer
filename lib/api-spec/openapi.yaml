@@ -463,7 +463,75 @@ paths:
           in: path
           required: true
           schema:
-            type: integer
+            type: string
+      responses:
+        '200':
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteSuccess'
+
+  /announcements/{announcementId}/replies:
+    get:
+      tags: [Announcements]
+      operationId: listAnnouncementReplies
+      summary: List replies for an announcement (any authenticated user)
+      parameters:
+        - name: announcementId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of replies (oldest first)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AnnouncementReply'
+    post:
+      tags: [Announcements]
+      operationId: createAnnouncementReply
+      summary: Reply to an announcement (any authenticated user)
+      parameters:
+        - name: announcementId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnnouncementReplyInput'
+      responses:
+        '201':
+          description: Reply created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnnouncementReply'
+
+  /announcements/{announcementId}/replies/{replyId}:
+    delete:
+      tags: [Announcements]
+      operationId: deleteAnnouncementReply
+      summary: Delete a reply (author can delete own; leader can delete any)
+      parameters:
+        - name: announcementId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: replyId
+          in: path
+          required: true
+          schema:
+            type: string
       responses:
         '200':
           description: Deleted
@@ -779,7 +847,7 @@ components:
       required: [id, title, content, createdAt, authorName]
       properties:
         id:
-          type: integer
+          type: string
         title:
           type: string
         content:
@@ -791,6 +859,38 @@ components:
           type: ["string", "null"]
         authorImageUrl:
           type: ["string", "null"]
+        replies:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnnouncementReply'
+
+    AnnouncementReply:
+      type: object
+      required: [id, announcementId, authorUserId, content, createdAt, authorName]
+      properties:
+        id:
+          type: string
+        announcementId:
+          type: string
+        authorUserId:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        authorName:
+          type: ["string", "null"]
+        authorImageUrl:
+          type: ["string", "null"]
+
+    AnnouncementReplyInput:
+      type: object
+      required: [content]
+      properties:
+        content:
+          type: string
+          minLength: 1
 
     AnnouncementInput:
       type: object

@@ -24,7 +24,7 @@ export default function Home() {
         ) : (
           <>
             <p className="text-primary-foreground/70 text-sm mb-1">
-              {profile?.role === "leader" ? "قائد / Leader" : profile?.role === "developer" ? "مطور / Developer" : profile?.role === "cp_of_cps" ? "قائد كوربال / CP of CPs" : profile?.role === "cp" ? "CP / كوربال" : "كشاف / Scout"}
+              {profile?.role === "leader" ? "Leader" : profile?.role === "developer" ? "Developer" : profile?.role === "cp_of_cps" ? "CP of CPs" : profile?.role === "cp" ? "CP" : "Scout"}
             </p>
             <h2 className="text-2xl font-serif font-bold mb-1">
               أهلاً، {profile?.firstName ?? "أهلاً"} 
@@ -86,7 +86,7 @@ export default function Home() {
                 ) : (
                   <p className="text-2xl font-bold text-foreground">{stats?.totalCp ?? 0}</p>
                 )}
-                <p className="text-xs text-muted-foreground">CP / كوربال</p>
+                <p className="text-xs text-muted-foreground">CP</p>
               </div>
             </div>
           </CardContent>
@@ -104,7 +104,7 @@ export default function Home() {
                 ) : (
                   <p className="text-2xl font-bold text-foreground">{stats?.totalCpOfCps ?? 0}</p>
                 )}
-                <p className="text-xs text-muted-foreground">CP of CPs / قائد كوربال</p>
+                <p className="text-xs text-muted-foreground">CP of CPs</p>
               </div>
             </div>
           </CardContent>

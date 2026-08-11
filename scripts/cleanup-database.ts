@@ -78,7 +78,7 @@ async function cleanupDatabase() {
     console.log(`\nPreserved ${developerUserIds.length} developer account(s):`);
     for (const userId of developerUserIds) {
       const user = await UserModel.findOne({ id: userId });
-      console.log(`  - ${user?.firstName} ${user?.lastName} (${user?.email})`);
+      console.log(`  - ${user?.firstName} ${user?.lasbtName} (${user?.email})`);
     }
 
   } catch (error) {
@@ -90,4 +90,4 @@ async function cleanupDatabase() {
   }
 }
 
-cleanupDatabase();
+cleanupDatabase();  

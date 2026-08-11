@@ -3,6 +3,8 @@
 # Scout Organizer - Local Development with Ngrok
 # This script starts your app locally and exposes it via Ngrok
 
+export PATH="$HOME/.local/bin:$HOME/.local/share/pnpm/bin:$HOME/bin:$PATH"
+
 echo "🚀 Starting Scout Organizer locally with Ngrok..."
 
 # Check if MongoDB is running

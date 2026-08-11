@@ -18,6 +18,8 @@ export interface ScoutUser {
   email: string | null;
   /** @nullable */
   profileImageUrl?: string | null;
+  /** @nullable */
+  patrol?: string | null;
   role: ScoutUserRole;
   createdAt: Date;
 }

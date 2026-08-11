@@ -12,7 +12,7 @@ async function ensureLeaderOrDeveloper(userId: string) {
     .select("role")
     .eq("userId", userId)
     .single();
-  return data && (data.role === "leader" || data.role === "developer" || data.role === "cp_of_cps");
+  return data && (data.role === "leader" || data.role === "developer");
 }
 
 router.post("/access-requests", async (req, res) => {
@@ -375,3 +375,6 @@ router.get("/access-requests/export", async (req, res) => {
 });
 
 export default router;
+
+
+//accessRequests.ts

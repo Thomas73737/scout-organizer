@@ -10,13 +10,14 @@ import {
   Star, Camera, Mountain, TreePine,
   Tent, Cross, HandHeart, Quote,
   Sparkles, ChevronUp, Eye,
-  Trophy, Compass, Flame,
+  Trophy, Compass, Flame, Flag,
+  Youtube, Facebook, Instagram,
 } from "lucide-react";
+import { FaSoundcloud } from "react-icons/fa";
 
 import { ThemeToggle } from "@/components/theme-toggle";
 import logoImg from "@/assets/scoutPic/avatars-logo.jpg";
 import campImg from "@/assets/scoutPic/camp.jpg";
-import gallery1Img from "@/assets/scoutPic/gallery1.jpg";
 import gallery2Img from "@/assets/scoutPic/gallery2.jpg";
 
 const navLinks = [
@@ -28,7 +29,7 @@ const navLinks = [
 
 const values = [
   {
-    title: "Faith",
+    title: "Faith in God",
     icon: Cross,
     description:
       "Rooted in Christian values, guiding every step of our journey with trust in God and respect for all creation.",
@@ -38,61 +39,46 @@ const values = [
     iconColor: "text-amber-600",
   },
   {
-    title: "Brotherhood",
-    icon: Heart,
+    title: "Patriotism",
+    icon: Flag,
     description:
-      "United as one family, building lifelong bonds of friendship, mutual respect, and unwavering support for one another.",
+      "A true Scout shows love for their country by respecting its laws, protecting the environment, serving the community, and helping others.",
     color: "from-rose-500/20 to-pink-500/10",
     borderColor: "border-rose-500/30",
     iconBg: "bg-rose-500/10",
     iconColor: "text-rose-600",
   },
   {
-    title: "Service",
-    icon: HandHeart,
+    title: "Brotherhood",
+    icon: Heart,
     description:
-      "Always ready to serve our community and country, putting others before ourselves through meaningful action.",
+      "United as one family, building lifelong bonds of friendship, mutual respect, and unwavering support for people inside and outside our scouts community.",
     color: "from-emerald-500/20 to-green-500/10",
     borderColor: "border-emerald-500/30",
     iconBg: "bg-emerald-500/10",
     iconColor: "text-emerald-600",
   },
-  {
-    title: "Discipline",
-    icon: Flame,
-    description:
-      "Forged through commitment and perseverance, building character through structure, dedication, and self-mastery.",
-    color: "from-blue-500/20 to-indigo-500/10",
-    borderColor: "border-blue-500/30",
-    iconBg: "bg-blue-500/10",
-    iconColor: "text-blue-600",
-  },
 ];
 
 const activities = [
   {
-    image: campImg,
+    coverImage: campImg,
+    images: ["/camp-photo-1.jpg", "/camp-photo-2.jpg", "/camp-photo-3.jpg"],
     label: "Camps",
-    sublabel: "Wilderness & Survival",
-    span: "md:col-span-2 md:row-span-2",
-  },
-  {
-    image: gallery1Img,
-    label: "Leadership",
-    sublabel: "Character Building",
     span: "",
   },
   {
-    image: gallery2Img,
-    label: "Community Service",
-    sublabel: "Giving Back",
+    coverImage: gallery2Img,
+    images: ["/final-ceremony.jpg"],
+    video: "/final-ceremony-video.mp4",
+    label: "Final Ceremony",
     span: "",
   },
   {
-    image: campImg,
-    label: "Adventures",
-    sublabel: "Exploration & Discovery",
-    span: "md:col-span-2",
+    coverImage: "/big-wow-1.jpg",
+    images: ["/big-wow-1.jpg", "/big-wow-2.jpg"],
+    label: "Big Wow",
+    span: "",
   },
 ];
 
@@ -478,7 +464,7 @@ function AboutSection() {
             <div className="relative">
               <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-amber-900/10">
                 <img
-                  src={gallery1Img}
+                  src="/about-image.jpg"
                   alt="Scout activities"
                   className="w-full h-[500px] object-cover"
                 />
@@ -496,7 +482,7 @@ function AboutSection() {
                     <Trophy className="w-6 h-6 text-white" />
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-amber-900">40+</p>
+                    <p className="text-2xl font-bold text-amber-900">28+</p>
                     <p className="text-xs text-amber-700/70">Years of Excellence</p>
                   </div>
                 </div>
@@ -524,7 +510,7 @@ function AboutSection() {
                   building a better world.
                 </p>
                 <p>
-                  For over four decades, we have guided young people through a journey
+                  For over 25 years, we have guided young people through a journey
                   of self-discovery, leadership development, and community engagement.
                   Our program combines the timeless values of scouting with modern
                   approaches to youth development, creating an environment where every
@@ -539,7 +525,7 @@ function AboutSection() {
 
               <div className="flex flex-wrap gap-6 mt-8">
                 {[
-                  { label: "Active Members", value: "500+" },
+                  { label: "Active Members", value: "1000+" },
                   { label: "Annual Events", value: "30+" },
                   { label: "Community Projects", value: "100+" },
                 ].map((stat) => (
@@ -583,13 +569,13 @@ function ValuesSection() {
             Core Values
           </h2>
           <p className="text-amber-200/70 max-w-2xl mx-auto text-lg">
-            These four pillars form the foundation of everything we do, guiding our
+            These three pillars form the foundation of everything we do, guiding our
             members toward becoming responsible leaders and compassionate human beings.
           </p>
         </FadeInSection>
 
         {/* Cards */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {values.map((value, index) => {
             const Icon = value.icon;
             return (
@@ -645,11 +631,161 @@ function ValuesSection() {
   );
 }
 
+function AlbumLightbox({
+  coverImage,
+  images,
+  video,
+  label,
+  onClose,
+}: {
+  coverImage: string;
+  images: string[];
+  video?: string;
+  label: string;
+  onClose: () => void;
+}) {
+  const [current, setCurrent] = useState(0);
+  const allItems = [
+    { type: "image" as const, src: coverImage },
+    ...images
+      .filter((img) => img !== coverImage)
+      .map((img) => ({ type: "image" as const, src: img })),
+  ];
+  if (video) allItems.push({ type: "video" as const, src: video });
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.8, opacity: 0 }}
+        className="relative max-w-4xl w-full"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute -top-12 right-0 w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="text-center mb-4">
+          <span className="text-amber-400 font-semibold text-lg">{label}</span>
+          <span className="text-white/50 text-sm ml-3">
+            {current + 1} / {allItems.length}
+          </span>
+        </div>
+
+        <div className="relative rounded-2xl overflow-hidden bg-black aspect-video">
+          {allItems[current].type === "image" ? (
+            <img
+              src={allItems[current].src}
+              alt={`${label} ${current + 1}`}
+              className="w-full h-full object-contain"
+            />
+          ) : (
+            <video
+              src={allItems[current].src}
+              controls
+              autoPlay
+              className="w-full h-full object-contain"
+            />
+          )}
+        </div>
+
+        {allItems.length > 1 && (
+          <div className="flex items-center justify-center gap-3 mt-4">
+            <button
+              onClick={() => setCurrent((c) => (c > 0 ? c - 1 : allItems.length - 1))}
+              className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
+            >
+              ←
+            </button>
+            <div className="flex gap-2">
+              {allItems.map((_, i) => (
+                <button
+                  key={i}
+                  onClick={() => setCurrent(i)}
+                  className={cn(
+                    "w-2.5 h-2.5 rounded-full transition-all",
+                    i === current ? "bg-amber-400 w-6" : "bg-white/30 hover:bg-white/50"
+                  )}
+                />
+              ))}
+            </div>
+            <button
+              onClick={() => setCurrent((c) => (c < allItems.length - 1 ? c + 1 : 0))}
+              className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
+            >
+              →
+            </button>
+          </div>
+        )}
+
+        <p className="text-center text-white/40 text-sm mt-3">Tap outside to close</p>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function HeartSmileVideo() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          videoRef.current?.play().catch(() => {});
+        } else {
+          videoRef.current?.pause();
+        }
+      },
+      { threshold: 0.5 }
+    );
+    if (containerRef.current) observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={containerRef}>
+      <video
+        ref={videoRef}
+        src="/heart-smile-video.mp4"
+        controls
+        muted
+        playsInline
+        className="w-full aspect-video object-cover"
+      />
+    </div>
+  );
+}
+
 function ActivitiesSection() {
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
   return (
     <section id="activities" className="relative py-24 md:py-32 overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-b from-white dark:from-gray-950 via-amber-50/30 dark:via-amber-950/20 to-white dark:to-gray-950 pointer-events-none" />
       <FloatingOrbs />
+
+      <AnimatePresence>
+        {lightboxIndex !== null && (
+          <AlbumLightbox
+            coverImage={activities[lightboxIndex].coverImage as string}
+            images={activities[lightboxIndex].images}
+            video={activities[lightboxIndex].video}
+            label={activities[lightboxIndex].label}
+            onClose={() => setLightboxIndex(null)}
+          />
+        )}
+      </AnimatePresence>
 
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <FadeInSection className="text-center mb-16">
@@ -666,33 +802,59 @@ function ActivitiesSection() {
         </FadeInSection>
 
         {/* Gallery Grid */}
-        <div className="grid md:grid-cols-4 gap-4 auto-rows-[200px]">
+        <div className="grid md:grid-cols-3 gap-4 auto-rows-[200px] w-fit mx-auto">
           {activities.map((item, index) => (
             <FadeInSection key={index} delay={index * 0.1}>
               <motion.div
                 whileHover={{ scale: 1.02 }}
                 transition={{ duration: 0.4 }}
+                onClick={() => setLightboxIndex(index)}
                 className={cn(
                   "relative rounded-2xl overflow-hidden group cursor-pointer h-full",
                   item.span
                 )}
               >
                 <img
-                  src={item.image}
+                  src={item.coverImage}
                   alt={item.label}
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                <div className="absolute top-3 right-3">
+                  <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-black/40 text-white/80 text-xs">
+                    <Camera className="w-3 h-3" />
+                    {1 + item.images.filter((img) => img !== item.coverImage).length + (item.video ? 1 : 0)}
+                  </span>
+                </div>
                 <div className="absolute bottom-0 left-0 right-0 p-6">
                   <span className="inline-block px-3 py-1 rounded-full bg-amber-500/90 text-white text-xs font-semibold mb-2">
                     {item.label}
                   </span>
-                  <p className="text-white/70 text-sm">{item.sublabel}</p>
                 </div>
               </motion.div>
             </FadeInSection>
           ))}
         </div>
+
+        {/* Heart Smile Section */}
+        <FadeInSection className="mt-20 text-center">
+          <motion.h3
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-5xl md:text-7xl font-serif font-bold text-transparent bg-clip-text bg-gradient-to-r from-amber-500 via-rose-500 to-amber-600 mb-8 tracking-wide"
+          >
+            Heart Smile
+          </motion.h3>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            className="relative max-w-3xl mx-auto rounded-2xl overflow-hidden shadow-2xl shadow-amber-900/20"
+          >
+            <HeartSmileVideo />
+          </motion.div>
+        </FadeInSection>
       </div>
     </section>
   );
@@ -700,10 +862,10 @@ function ActivitiesSection() {
 
 function StatsSection() {
   const stats = [
-    { icon: Users, target: 500, suffix: "+", label: "Members" },
+    { icon: Users, target: 1000, suffix: "+", label: "Members" },
     { icon: Tent, target: 120, suffix: "+", label: "Camps" },
     { icon: Star, target: 300, suffix: "+", label: "Activities" },
-    { icon: Clock, target: 43, suffix: "", label: "Years of Service" },
+    { icon: Clock, target: 28, suffix: "", label: "Years of Service" },
   ];
 
   return (
@@ -862,15 +1024,52 @@ function CTASection() {
 }
 
 function Footer() {
+  const [enlargedQR, setEnlargedQR] = useState<string | null>(null);
+
   return (
     <footer id="contact" className="relative bg-amber-950 text-amber-200/70">
       {/* Top wave decoration */}
       <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-600 via-amber-500 to-orange-500" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 md:py-20">
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-12">
+      {/* QR Lightbox */}
+      <AnimatePresence>
+        {enlargedQR && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+            onClick={() => setEnlargedQR(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.5 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.5 }}
+              className="relative max-w-md w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={enlargedQR}
+                alt="QR Code enlarged"
+                className="w-full rounded-xl shadow-2xl ring-2 ring-amber-500/30"
+              />
+              <button
+                onClick={() => setEnlargedQR(null)}
+                className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-amber-600 hover:bg-amber-500 text-white flex items-center justify-center shadow-lg transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <p className="text-center text-amber-300 text-sm mt-3">Tap anywhere to close</p>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div className="w-full px-6 sm:px-10 lg:px-16 py-16 md:py-20">
+        {/* Top row: Brand + Stay Connected */}
+        <div className="flex flex-col sm:flex-row gap-10 lg:gap-16 mb-12">
           {/* Brand */}
-          <div className="lg:col-span-1">
+          <div className="sm:w-1/2 lg:w-2/5 shrink-0">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full overflow-hidden ring-2 ring-amber-500/30">
                 <img
@@ -887,65 +1086,10 @@ function Footer() {
               Building leaders through faith, service, and adventure for generations.
               Part of the worldwide scouting movement.
             </p>
-            <div className="flex gap-3">
-              {[Heart, Users, Star, Compass].map((Icon, i) => (
-                <motion.div
-                  key={i}
-                  whileHover={{ y: -2 }}
-                  className="w-9 h-9 rounded-full bg-amber-800/50 border border-amber-700/30 flex items-center justify-center cursor-pointer hover:bg-amber-700/50 transition-colors"
-                >
-                  <Icon className="w-4 h-4 text-amber-300/70" />
-                </motion.div>
-              ))}
-            </div>
           </div>
 
-          {/* Quick Links */}
-          <div>
-            <h4 className="text-white font-semibold mb-4">Quick Links</h4>
-            <ul className="space-y-3">
-              {[
-                { label: "About Us", href: "#about" },
-                { label: "Our Values", href: "#values" },
-                { label: "Activities", href: "#activities" },
-                { label: "Member Login", href: "/login" },
-                { label: "Contact Us", href: "#contact" },
-              ].map((link) => (
-                <li key={link.label}>
-                  <a
-                    href={link.href}
-                    className="text-sm hover:text-amber-300 transition-colors"
-                  >
-                    {link.label}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Contact */}
-          <div>
-            <h4 className="text-white font-semibold mb-4">Contact</h4>
-            <ul className="space-y-3">
-              {[
-                { icon: MapPin, text: "Heliopolis, Cairo, Egypt" },
-                { icon: Phone, text: "+20 100 000 0000" },
-                { icon: Mail, text: "info@saintgeorgescouts.org" },
-                { icon: Clock, text: "Sat–Thu: 9:00 AM – 8:00 PM" },
-              ].map((item) => {
-                const Icon = item.icon;
-                return (
-                  <li key={item.text} className="flex items-start gap-3">
-                    <Icon className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
-                    <span className="text-sm">{item.text}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-
-          {/* Newsletter / CTA */}
-          <div>
+          {/* Stay Connected */}
+          <div className="sm:w-1/2 lg:w-3/5">
             <h4 className="text-white font-semibold mb-4">Stay Connected</h4>
             <p className="text-sm text-amber-300/50 mb-4">
               Follow us on social media for the latest updates, events, and stories
@@ -954,12 +1098,103 @@ function Footer() {
             <Link href="/login">
               <Button
                 variant="outline"
-                className="w-full rounded-full border-amber-700/50 text-amber-300 hover:bg-amber-800 hover:text-amber-200 transition-all"
+                className="rounded-full border-amber-700/50 text-amber-300 hover:bg-amber-800 hover:text-amber-200 transition-all"
               >
                 Join Our Community
                 <ArrowRight className="ml-2 w-4 h-4" />
               </Button>
             </Link>
+          </div>
+        </div>
+
+        {/* Contact - landscape row with all links in one line */}
+        <div className="border-t border-amber-800/50 pt-10">
+          <h4 className="text-white font-semibold mb-6">Contact</h4>
+          <div className="flex flex-col sm:flex-row sm:items-start gap-8 sm:gap-12">
+            {/* SGS Heliopolis + QR */}
+            <div className="flex flex-col items-center">
+              <a
+                href="https://youtube.com/@sgs_heliopoles?si=eK18tGGTP8DmyOzK"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-sm hover:text-amber-300 transition-colors"
+              >
+                <Youtube className="w-4 h-4 text-amber-500 shrink-0" />
+                <span>SGS Heliopolis</span>
+              </a>
+              <button
+                onClick={() => setEnlargedQR("/first-youtube-link-qr.jpeg")}
+                className="mt-3 cursor-pointer focus:outline-none"
+              >
+                <img
+                  src="/first-youtube-link-qr.jpeg"
+                  alt="QR code for SGS Heliopolis — click to enlarge"
+                  className="w-20 h-20 rounded-md object-cover ring-1 ring-amber-700/30 hover:ring-amber-400/60 hover:scale-110 transition-all"
+                />
+              </button>
+            </div>
+
+            {/* Saint George Scout + QR */}
+            <div className="flex flex-col items-center">
+              <a
+                href="https://youtube.com/@saintgeorgescout?si=kVg8OexFp-N3VA0S"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-sm hover:text-amber-300 transition-colors"
+              >
+                <Youtube className="w-4 h-4 text-amber-500 shrink-0" />
+                <span>Saint George Scout</span>
+              </a>
+              <button
+                onClick={() => setEnlargedQR("/second-youtube-link-qr.jpeg")}
+                className="mt-3 cursor-pointer focus:outline-none"
+              >
+                <img
+                  src="/second-youtube-link-qr.jpeg"
+                  alt="QR code for Saint George Scout — click to enlarge"
+                  className="w-20 h-20 rounded-md object-cover ring-1 ring-amber-700/30 hover:ring-amber-400/60 hover:scale-110 transition-all"
+                />
+              </button>
+            </div>
+
+            {/* Facebook */}
+            <div className="flex flex-col items-center">
+              <a
+                href="https://www.facebook.com/SaintGeorgeScoutTeam?locale=ar_AR"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-sm hover:text-amber-300 transition-colors"
+              >
+                <Facebook className="w-4 h-4 text-amber-500 shrink-0" />
+                <span>Saint George Scout Team</span>
+              </a>
+            </div>
+
+            {/* Instagram */}
+            <div className="flex flex-col items-center">
+              <a
+                href="https://www.instagram.com/sgs_saintgeorgescout?igsh=MmttdGc4bzc0YXVx"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-sm hover:text-amber-300 transition-colors"
+              >
+                <Instagram className="w-4 h-4 text-amber-500 shrink-0" />
+                <span>sgs_saintgeorgescout</span>
+              </a>
+            </div>
+
+            {/* SoundCloud */}
+            <div className="flex flex-col items-center">
+              <a
+                href="https://soundcloud.com/saint-george-scout-sgs"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-sm hover:text-amber-300 transition-colors"
+              >
+                <FaSoundcloud className="w-4 h-4 text-amber-500 shrink-0" />
+                <span>SoundCloud</span>
+              </a>
+            </div>
           </div>
         </div>
 
@@ -969,14 +1204,6 @@ function Footer() {
             &copy; {new Date().getFullYear()} Saint George Heliopolis Scouts. All rights
             reserved.
           </p>
-          <div className="flex items-center gap-6 text-sm text-amber-300/40">
-            <a href="#" className="hover:text-amber-300 transition-colors">
-              Privacy Policy
-            </a>
-            <a href="#" className="hover:text-amber-300 transition-colors">
-              Terms of Service
-            </a>
-          </div>
         </div>
       </div>
     </footer>

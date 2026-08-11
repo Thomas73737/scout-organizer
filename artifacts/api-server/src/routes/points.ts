@@ -10,7 +10,7 @@ async function isDeveloperOrLeader(userId: string): Promise<boolean> {
     .select("role")
     .eq("userId", userId)
     .single();
-  return data?.role === "developer" || data?.role === "leader" || data?.role === "cp_of_cps";
+  return data?.role === "developer" || data?.role === "leader";
 }
 
 async function ensureProfile(userId: string) {
@@ -116,6 +116,63 @@ router.get("/points/user/:userId", async (req, res) => {
       profileImageUrl: user.profileImageUrl,
     } : null,
   });
+});
+
+router.delete("/points/transaction/:transactionId", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  await ensureProfile(req.user.id);
+  const hasAccess = await isDeveloperOrLeader(req.user.id);
+  if (!hasAccess) {
+    res.status(403).json({ error: "Leaders and developers only" });
+    return;
+  }
+
+  const { transactionId } = req.params;
+  if (!transactionId) {
+    res.status(400).json({ error: "Transaction ID is required" });
+    return;
+  }
+
+  const { data: existing } = await supabase
+    .from("point_transactions")
+    .select("id")
+    .eq("id", transactionId)
+    .single();
+
+  if (!existing) {
+    res.status(404).json({ error: "Transaction not found" });
+    return;
+  }
+
+  await supabase.from("point_transactions").delete().eq("id", transactionId);
+
+  res.json({ success: true, message: "Transaction deleted" });
+});
+
+router.delete("/points/user/:userId/all", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  await ensureProfile(req.user.id);
+  const hasAccess = await isDeveloperOrLeader(req.user.id);
+  if (!hasAccess) {
+    res.status(403).json({ error: "Leaders and developers only" });
+    return;
+  }
+
+  const { userId } = req.params;
+  if (!userId) {
+    res.status(400).json({ error: "User ID is required" });
+    return;
+  }
+
+  await supabase.from("point_transactions").delete().eq("userId", userId);
+
+  res.json({ success: true, message: "All points deleted for user" });
 });
 
 router.get("/points/leaderboard", async (req, res) => {

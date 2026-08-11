@@ -35,7 +35,7 @@ async function isDeveloperOrLeader(userId: string): Promise<boolean> {
     .select("role")
     .eq("userId", userId)
     .single();
-  return data?.role === "developer" || data?.role === "leader" || data?.role === "cp_of_cps";
+  return data?.role === "developer" || data?.role === "leader";
 }
 
 router.get("/attendance/sessions", async (req, res) => {
@@ -189,11 +189,11 @@ router.post("/attendance/sessions/:sessionId/records", async (req, res) => {
   // Delete existing records
   await supabase.from("attendance_records").delete().eq("sessionId", sessionId);
 
-  // Get all scouts
+  // Get all scouts, CPs, and CP of CPs
   const { data: allProfiles } = await supabase
     .from("scout_profiles")
     .select("*")
-    .eq("role", "scout");
+    .in("role", ["scout", "cp", "cp_of_cps"]);
 
   const allUsers = await Promise.all(
     (allProfiles || []).map(async (profile) => {

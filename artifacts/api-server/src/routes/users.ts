@@ -64,7 +64,7 @@ async function isDeveloperOrLeader(userId: string): Promise<boolean> {
     .select("role")
     .eq("userId", userId)
     .single();
-  return data?.role === "developer" || data?.role === "leader" || data?.role === "cp_of_cps";
+  return data?.role === "developer" || data?.role === "leader";
 }
 
 async function isDeveloper(userId: string): Promise<boolean> {
@@ -579,7 +579,7 @@ router.post("/users/login", async (req, res) => {
     res.json({
       message: "Login successful",
       user: profile,
-      isAdmin: profile.role === "leader" || profile.role === "developer" || profile.role === "cp_of_cps"
+      isAdmin: profile.role === "leader" || profile.role === "developer"
     });
   } catch (err: any) {
     console.error("Login failed:", err?.message ?? err);

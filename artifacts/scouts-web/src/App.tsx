@@ -39,7 +39,7 @@ function ProtectedRoute({ component: Component, adminOnly = false }: { component
     return <Redirect to="/login" />;
   }
 
-  if (adminOnly && profile?.role !== "leader" && profile?.role !== "developer" && profile?.role !== "cp_of_cps") {
+  if (adminOnly && profile?.role !== "leader" && profile?.role !== "developer") {
     return <Redirect to="/dashboard" />;
   }
 
@@ -57,7 +57,9 @@ function Router() {
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/waiting" component={Waiting} />
-      <Route path="/" component={Landing} />
+      <Route path="/">
+        {isAuthenticated ? <Redirect to="/dashboard" /> : <Landing />}
+      </Route>
       <Route path="/dashboard">
         <ProtectedRoute component={Home} />
       </Route>

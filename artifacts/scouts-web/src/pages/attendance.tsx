@@ -226,7 +226,7 @@ function AttendanceSessionDetail({ sessionId, onClose }: { sessionId: string; on
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { data: profile } = useGetMyProfile();
-  const isLeader = profile?.role === "leader" || profile?.role === "developer" || profile?.role === "cp_of_cps";
+  const isLeader = profile?.role === "leader" || profile?.role === "developer";
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
 
   const [attendance, setAttendance] = useState<SessionAttendanceState>({});
@@ -288,7 +288,7 @@ function AttendanceSessionDetail({ sessionId, onClose }: { sessionId: string; on
   };
 
   const handleSubmit = () => {
-    const scouts = allUsers?.filter((u) => u.role === "scout") ?? [];
+    const scouts = allUsers?.filter((u) => u.role === "scout" || u.role === "cp" || u.role === "cp_of_cps") ?? [];
     const records = scouts.map((u) => {
       const existingRecord = session?.records?.find((r) => r.userId === u.replitId);
       const state = getScoutState(u.replitId, existingRecord);
@@ -324,7 +324,7 @@ function AttendanceSessionDetail({ sessionId, onClose }: { sessionId: string; on
     );
   }
 
-  const scouts = allUsers?.filter((u) => u.role === "scout") ?? [];
+  const scouts = allUsers?.filter((u) => u.role === "scout" || u.role === "cp" || u.role === "cp_of_cps") ?? [];
 
   return (
     <div className="space-y-4">
@@ -445,12 +445,12 @@ export default function Attendance() {
   const [deletingSessionId, setDeletingSessionId] = useState<string | null>(null);
   const [confirmDeleteSessionId, setConfirmDeleteSessionId] = useState<string | null>(null);
 
-  const isLeader = profile?.role === "leader" || profile?.role === "developer" || profile?.role === "cp_of_cps";
-  const isAdmin = profile?.role === "leader" || profile?.role === "developer" || profile?.role === "cp_of_cps";
+  const isLeader = profile?.role === "leader" || profile?.role === "developer";
+  const isAdmin = profile?.role === "leader" || profile?.role === "developer";
 
   const patrols = ["صقر", "فهد", "ثعلب", "ذئب", "نمر", "نسر", "أسد", "غراب", "بلبل", "ديك", "خفاش", "غزال"];
 
-  const scoutsByPatrol = allUsers?.filter((u) => u.role === "scout" && u.patrol).reduce((acc, scout) => {
+  const scoutsByPatrol = allUsers?.filter((u) => (u.role === "scout" || u.role === "cp" || u.role === "cp_of_cps") && u.patrol).reduce((acc, scout) => {
     if (scout.patrol) {
       if (!acc[scout.patrol]) {
         acc[scout.patrol] = [];

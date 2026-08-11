@@ -136,7 +136,7 @@ export function usePushNotifications(userId: string | null) {
 
       const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(key),
+        applicationServerKey: urlBase64ToUint8Array(key).buffer as ArrayBuffer,
       });
 
       const subJson = subscription.toJSON();

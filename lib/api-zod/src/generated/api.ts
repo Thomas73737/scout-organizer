@@ -76,6 +76,7 @@ export const ListUsersResponseItem = zod.object({
   "lastName": zod.string().nullable(),
   "email": zod.string().nullable(),
   "profileImageUrl": zod.string().nullish(),
+  "patrol": zod.string().nullish(),
   "role": zod.enum(['scout', 'cp', 'cp_of_cps', 'leader', 'developer']),
   "createdAt": zod.coerce.date()
 })
@@ -92,6 +93,7 @@ export const GetMyProfileResponse = zod.object({
   "lastName": zod.string().nullable(),
   "email": zod.string().nullable(),
   "profileImageUrl": zod.string().nullish(),
+  "patrol": zod.string().nullish(),
   "role": zod.enum(['scout', 'cp', 'cp_of_cps', 'leader', 'developer']),
   "createdAt": zod.coerce.date()
 })
@@ -115,8 +117,113 @@ export const UpdateUserRoleResponse = zod.object({
   "lastName": zod.string().nullable(),
   "email": zod.string().nullable(),
   "profileImageUrl": zod.string().nullish(),
+  "patrol": zod.string().nullish(),
   "role": zod.enum(['scout', 'cp', 'cp_of_cps', 'leader', 'developer']),
   "createdAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary Get a user's badges (public)
+ */
+export const GetUserBadgesParams = zod.object({
+  "userId": zod.coerce.string()
+})
+
+export const GetUserBadgesResponse = zod.object({
+  "mainBadge": zod.string().nullish(),
+  "proficiencyBadges": zod.array(zod.string()).optional(),
+  "hobbyBadges": zod.array(zod.string()).optional()
+})
+
+
+/**
+ * @summary Set a user's main badge (admin only)
+ */
+export const SetMainBadgeParams = zod.object({
+  "userId": zod.coerce.string()
+})
+
+export const SetMainBadgeBody = zod.object({
+  "badge": zod.string()
+})
+
+export const SetMainBadgeResponse = zod.object({
+  "mainBadge": zod.string().nullish(),
+  "proficiencyBadges": zod.array(zod.string()).optional(),
+  "hobbyBadges": zod.array(zod.string()).optional()
+})
+
+
+/**
+ * @summary Remove a user's main badge (admin only)
+ */
+export const RemoveMainBadgeParams = zod.object({
+  "userId": zod.coerce.string()
+})
+
+export const RemoveMainBadgeResponse = zod.object({
+  "mainBadge": zod.string().nullish(),
+  "proficiencyBadges": zod.array(zod.string()).optional(),
+  "hobbyBadges": zod.array(zod.string()).optional()
+})
+
+
+/**
+ * @summary Add a proficiency badge (admin only)
+ */
+export const AddProficiencyBadgeParams = zod.object({
+  "userId": zod.coerce.string()
+})
+
+export const AddProficiencyBadgeBody = zod.object({
+  "badge": zod.string()
+})
+
+export const AddProficiencyBadgeResponse = zod.object({
+  "proficiencyBadges": zod.array(zod.string()).optional()
+})
+
+
+/**
+ * @summary Remove a proficiency badge (admin only)
+ */
+export const RemoveProficiencyBadgeParams = zod.object({
+  "userId": zod.coerce.string(),
+  "badgeName": zod.coerce.string()
+})
+
+export const RemoveProficiencyBadgeResponse = zod.object({
+  "proficiencyBadges": zod.array(zod.string()).optional()
+})
+
+
+/**
+ * @summary Add a hobby badge (admin only)
+ */
+export const AddHobbyBadgeParams = zod.object({
+  "userId": zod.coerce.string()
+})
+
+export const AddHobbyBadgeBody = zod.object({
+  "badge": zod.string()
+})
+
+export const AddHobbyBadgeResponse = zod.object({
+  "hobbyBadges": zod.array(zod.string()).optional()
+})
+
+
+/**
+ * @summary Remove a hobby badge (admin only)
+ */
+export const RemoveHobbyBadgeParams = zod.object({
+  "userId": zod.coerce.string(),
+  "badgeName": zod.coerce.string()
+})
+
+export const RemoveHobbyBadgeResponse = zod.object({
+  "hobbyBadges": zod.array(zod.string()).optional()
 })
 
 
@@ -144,8 +251,8 @@ export const ListAttendanceSessionsResponseItem = zod.object({
   "createdAt": zod.coerce.date(),
   "attendedCount": zod.number(),
   "totalCount": zod.number(),
-  "excusedCount": zod.number(),
-  "withGearCount": zod.number()
+  "excusedCount": zod.number().optional(),
+  "withGearCount": zod.number().optional()
 })
 export const ListAttendanceSessionsResponse = zod.array(ListAttendanceSessionsResponseItem)
 
@@ -170,8 +277,8 @@ export const CreateAttendanceSessionResponse = zod.object({
   "createdAt": zod.coerce.date(),
   "attendedCount": zod.number(),
   "totalCount": zod.number(),
-  "excusedCount": zod.number(),
-  "withGearCount": zod.number()
+  "excusedCount": zod.number().optional(),
+  "withGearCount": zod.number().optional()
 })
 
 
@@ -179,7 +286,7 @@ export const CreateAttendanceSessionResponse = zod.object({
  * @summary Get a session with all scout attendance records
  */
 export const GetAttendanceSessionParams = zod.object({
-  "sessionId": zod.string()
+  "sessionId": zod.coerce.string()
 })
 
 export const GetAttendanceSessionResponse = zod.object({
@@ -203,7 +310,7 @@ export const GetAttendanceSessionResponse = zod.object({
  * @summary Submit attendance records for a session (leader only)
  */
 export const SubmitAttendanceRecordsParams = zod.object({
-  "sessionId": zod.string()
+  "sessionId": zod.coerce.string()
 })
 
 export const SubmitAttendanceRecordsBody = zod.object({
@@ -239,9 +346,9 @@ export const GetMyAttendanceSummaryResponse = zod.object({
   "totalSessions": zod.number(),
   "attended": zod.number(),
   "absent": zod.number(),
-  "absentExcused": zod.number(),
-  "absentUnexcused": zod.number(),
-  "withoutGear": zod.number(),
+  "absentExcused": zod.number().optional(),
+  "absentUnexcused": zod.number().optional(),
+  "withoutGear": zod.number().optional(),
   "rate": zod.number()
 })
 
@@ -250,12 +357,21 @@ export const GetMyAttendanceSummaryResponse = zod.object({
  * @summary List all announcements (newest first)
  */
 export const ListAnnouncementsResponseItem = zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "title": zod.string(),
   "content": zod.string(),
   "createdAt": zod.coerce.date(),
   "authorName": zod.string().nullable(),
+  "authorImageUrl": zod.string().nullish(),
+  "replies": zod.array(zod.object({
+  "id": zod.string(),
+  "announcementId": zod.string(),
+  "authorUserId": zod.string(),
+  "content": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "authorName": zod.string().nullable(),
   "authorImageUrl": zod.string().nullish()
+})).optional()
 })
 export const ListAnnouncementsResponse = zod.array(ListAnnouncementsResponseItem)
 
@@ -273,8 +389,73 @@ export const CreateAnnouncementBody = zod.object({
 })
 
 export const CreateAnnouncementResponse = zod.object({
-  "id": zod.number(),
+  "id": zod.string(),
   "title": zod.string(),
+  "content": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "authorName": zod.string().nullable(),
+  "authorImageUrl": zod.string().nullish(),
+  "replies": zod.array(zod.object({
+  "id": zod.string(),
+  "announcementId": zod.string(),
+  "authorUserId": zod.string(),
+  "content": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "authorName": zod.string().nullable(),
+  "authorImageUrl": zod.string().nullish()
+})).optional()
+})
+
+
+/**
+ * @summary Delete an announcement (leader only)
+ */
+export const DeleteAnnouncementParams = zod.object({
+  "announcementId": zod.coerce.string()
+})
+
+export const DeleteAnnouncementResponse = zod.object({
+  "success": zod.boolean()
+})
+
+
+/**
+ * @summary List replies for an announcement (any authenticated user)
+ */
+export const ListAnnouncementRepliesParams = zod.object({
+  "announcementId": zod.coerce.string()
+})
+
+export const ListAnnouncementRepliesResponseItem = zod.object({
+  "id": zod.string(),
+  "announcementId": zod.string(),
+  "authorUserId": zod.string(),
+  "content": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "authorName": zod.string().nullable(),
+  "authorImageUrl": zod.string().nullish()
+})
+export const ListAnnouncementRepliesResponse = zod.array(ListAnnouncementRepliesResponseItem)
+
+
+/**
+ * @summary Reply to an announcement (any authenticated user)
+ */
+export const CreateAnnouncementReplyParams = zod.object({
+  "announcementId": zod.coerce.string()
+})
+
+
+
+
+export const CreateAnnouncementReplyBody = zod.object({
+  "content": zod.string().min(1)
+})
+
+export const CreateAnnouncementReplyResponse = zod.object({
+  "id": zod.string(),
+  "announcementId": zod.string(),
+  "authorUserId": zod.string(),
   "content": zod.string(),
   "createdAt": zod.coerce.date(),
   "authorName": zod.string().nullable(),
@@ -283,13 +464,14 @@ export const CreateAnnouncementResponse = zod.object({
 
 
 /**
- * @summary Delete an announcement (leader only)
+ * @summary Delete a reply (author can delete own; leader can delete any)
  */
-export const DeleteAnnouncementParams = zod.object({
-  "announcementId": zod.coerce.number()
+export const DeleteAnnouncementReplyParams = zod.object({
+  "announcementId": zod.coerce.string(),
+  "replyId": zod.coerce.string()
 })
 
-export const DeleteAnnouncementResponse = zod.object({
+export const DeleteAnnouncementReplyResponse = zod.object({
   "success": zod.boolean()
 })
 

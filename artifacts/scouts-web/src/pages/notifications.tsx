@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useLocation } from "wouter";
-import { Bell, BellRing, Check, CheckCheck, MessageSquare, Megaphone, FileText } from "lucide-react";
+import { Bell, BellRing, Check, CheckCheck, MessageSquare, Megaphone, FileText, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -55,7 +55,9 @@ export default function Notifications() {
         setNotifications(data.notifications ?? []);
         setUnreadCount(data.unreadCount ?? 0);
       }
-    } catch {} finally {
+    } catch {
+      // Silently handle fetch errors during polling
+    } finally {
       setLoading(false);
     }
   }, []);
@@ -66,16 +68,37 @@ export default function Notifications() {
     return () => clearInterval(interval);
   }, [fetchNotifications]);
 
+  const deleteNotification = async (id: string) => {
+    try {
+      const res = await fetch(`/api/notifications/${id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      if (res.ok) {
+        setNotifications((prev) => prev.filter((n) => n.id !== id));
+        const wasUnread = notifications.find((n) => n.id === id && !n.isRead);
+        if (wasUnread) {
+          setUnreadCount((prev) => Math.max(0, prev - 1));
+        }
+        toast({ title: "Notification deleted" });
+      }
+    } catch {
+      toast({ title: "Failed to delete notification", variant: "destructive" });
+    }
+  };
+
   const markAsRead = async (id: string) => {
     try {
-      await fetch(`/api/notifications/${id}/read`, {
+      const res = await fetch(`/api/notifications/${id}/read`, {
         method: "POST",
         credentials: "include",
       });
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-      );
-      setUnreadCount((prev) => Math.max(0, prev - 1));
+      if (res.ok) {
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+        );
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      }
     } catch {}
   };
 
@@ -207,6 +230,17 @@ export default function Notifications() {
                         <Check className="h-3.5 w-3.5" />
                       </Button>
                     )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0 text-muted-foreground hover:text-destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteNotification(notif.id);
+                      }}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

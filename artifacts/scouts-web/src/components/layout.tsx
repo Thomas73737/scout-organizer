@@ -71,7 +71,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const [showUserMenu, setShowUserMenu] = React.useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
-  const isLeader = profile?.role === "leader" || profile?.role === "developer" || profile?.role === "cp_of_cps";
+  const isLeader = profile?.role === "leader" || profile?.role === "developer";
   const { theme, setTheme } = useTheme();
 
   React.useEffect(() => {
@@ -283,7 +283,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
               </Avatar>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-white truncate leading-tight">{profile.firstName} {profile.lastName}</p>
-                <p className="text-xs text-white/40 truncate">{profile.email ?? profile.phone}</p>
+                <p className="text-xs text-white/40 truncate">{profile.email}</p>
               </div>
               <Button
                 variant="ghost"

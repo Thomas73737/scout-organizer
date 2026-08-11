@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { randomUUID } from "crypto";
 import { supabase } from "@workspace/db";
-import { CreateAnnouncementBody } from "@workspace/api-zod";
+import { CreateAnnouncementBody, CreateAnnouncementReplyBody } from "@workspace/api-zod";
 import { sendPushNotificationToMany } from "../lib/pushNotification";
 
 const router = Router();
@@ -12,7 +12,7 @@ async function isDeveloperOrLeader(userId: string): Promise<boolean> {
     .select("role")
     .eq("userId", userId)
     .single();
-  return data?.role === "developer" || data?.role === "leader" || data?.role === "cp_of_cps";
+  return data?.role === "developer" || data?.role === "leader";
 }
 
 async function ensureProfile(userId: string) {
@@ -28,6 +28,56 @@ async function ensureProfile(userId: string) {
       role: "scout",
     });
   }
+}
+
+async function getReplyWithAuthor(reply: any) {
+  const { data: author } = await supabase
+    .from("users")
+    .select("firstName, lastName, profileImageUrl")
+    .eq("id", reply.authorUserId)
+    .single();
+  return {
+    ...reply,
+    authorName: author ? `${author.firstName ?? ""} ${author.lastName ?? ""}`.trim() : null,
+    authorImageUrl: author?.profileImageUrl ?? null,
+  };
+}
+
+async function enrichAnnouncementsWithReplies(announcements: any[]) {
+  if (announcements.length === 0) return [];
+
+  const { data: replies } = await supabase
+    .from("announcement_replies")
+    .select("*")
+    .in("announcementId", announcements.map((a) => a.id))
+    .order("createdAt", { ascending: true });
+
+  const repliesByAnnouncement = new Map<string, any[]>();
+  if (replies && replies.length > 0) {
+    const authorIds = [...new Set(replies.map((r) => r.authorUserId))];
+    const { data: authors } = await supabase
+      .from("users")
+      .select("id, firstName, lastName, profileImageUrl")
+      .in("id", authorIds);
+    const authorMap = new Map((authors ?? []).map((u) => [u.id, u]));
+
+    for (const reply of replies) {
+      const author = authorMap.get(reply.authorUserId);
+      const entry = {
+        ...reply,
+        authorName: author ? `${author.firstName ?? ""} ${author.lastName ?? ""}`.trim() : null,
+        authorImageUrl: author?.profileImageUrl ?? null,
+      };
+      const list = repliesByAnnouncement.get(reply.announcementId) ?? [];
+      list.push(entry);
+      repliesByAnnouncement.set(reply.announcementId, list);
+    }
+  }
+
+  return announcements.map((a) => ({
+    ...a,
+    replies: repliesByAnnouncement.get(a.id) ?? [],
+  }));
 }
 
 router.get("/announcements", async (req, res) => {
@@ -62,7 +112,9 @@ router.get("/announcements", async (req, res) => {
     })
   );
 
-  res.json(enrichedAnnouncements);
+  const withReplies = await enrichAnnouncementsWithReplies(enrichedAnnouncements);
+
+  res.json(withReplies);
 });
 
 router.post("/announcements", async (req, res) => {
@@ -173,6 +225,101 @@ router.post("/announcements", async (req, res) => {
     authorName,
     authorImageUrl: author?.profileImageUrl ?? null,
   });
+});
+
+router.get("/announcements/:announcementId/replies", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const announcementId = req.params.announcementId;
+  const { data: replies } = await supabase
+    .from("announcement_replies")
+    .select("*")
+    .eq("announcementId", announcementId)
+    .order("createdAt", { ascending: true });
+
+  if (!replies) {
+    res.json([]);
+    return;
+  }
+
+  const enriched = await Promise.all(replies.map(getReplyWithAuthor));
+  res.json(enriched);
+});
+
+router.post("/announcements/:announcementId/replies", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+
+  const announcementId = req.params.announcementId;
+  const { data: announcement } = await supabase
+    .from("announcements")
+    .select("id")
+    .eq("id", announcementId)
+    .single();
+
+  if (!announcement) {
+    res.status(404).json({ error: "Announcement not found" });
+    return;
+  }
+
+  const parsed = CreateAnnouncementReplyBody.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: "Invalid body" });
+    return;
+  }
+
+  const reply = {
+    id: randomUUID(),
+    announcementId,
+    authorUserId: req.user.id,
+    content: parsed.data.content,
+    createdAt: new Date().toISOString(),
+  };
+
+  const { error } = await supabase.from("announcement_replies").insert(reply);
+  if (error) {
+    console.error("Failed to create announcement reply:", error.message);
+    res.status(500).json({ error: "Failed to create reply" });
+    return;
+  }
+
+  const enriched = await getReplyWithAuthor(reply);
+  res.status(201).json(enriched);
+});
+
+router.delete("/announcements/:announcementId/replies/:replyId", async (req, res) => {
+  if (!req.isAuthenticated()) {
+    res.status(401).json({ error: "Unauthorized" });
+    return;
+  }
+  await ensureProfile(req.user.id);
+
+  const { announcementId, replyId } = req.params;
+  const { data: reply } = await supabase
+    .from("announcement_replies")
+    .select("*")
+    .eq("id", replyId)
+    .eq("announcementId", announcementId)
+    .single();
+
+  if (!reply) {
+    res.status(404).json({ error: "Reply not found" });
+    return;
+  }
+
+  const hasAccess = await isDeveloperOrLeader(req.user.id);
+  if (!hasAccess && reply.authorUserId !== req.user.id) {
+    res.status(403).json({ error: "You can only delete your own replies" });
+    return;
+  }
+
+  await supabase.from("announcement_replies").delete().eq("id", replyId);
+  res.json({ success: true });
 });
 
 router.delete("/announcements/:announcementId", async (req, res) => {

@@ -115,6 +115,19 @@ CREATE TABLE IF NOT EXISTS announcements (
 );
 
 -- ============================================
+-- ANNOUNCEMENT REPLIES
+-- ============================================
+CREATE TABLE IF NOT EXISTS announcement_replies (
+  id TEXT PRIMARY KEY,
+  "announcementId" TEXT NOT NULL,
+  "authorUserId" TEXT NOT NULL,
+  content TEXT NOT NULL,
+  "createdAt" TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_announcement_replies_announcement ON announcement_replies ("announcementId");
+
+-- ============================================
 -- POSTS
 -- ============================================
 CREATE TABLE IF NOT EXISTS posts (

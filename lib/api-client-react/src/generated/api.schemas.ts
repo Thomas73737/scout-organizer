@@ -49,10 +49,6 @@ export interface ScoutUser {
   profileImageUrl?: string | null;
   /** @nullable */
   patrol?: string | null;
-  /** @nullable */
-  mainBadge?: string | null;
-  proficiencyBadges?: string[];
-  hobbyBadges?: string[];
   role: ScoutUserRole;
   createdAt: string;
 }
@@ -153,14 +149,26 @@ export interface AttendanceSummary {
   totalSessions: number;
   attended: number;
   absent: number;
-  absentExcused: number;
-  absentUnexcused: number;
-  withoutGear: number;
+  absentExcused?: number;
+  absentUnexcused?: number;
+  withoutGear?: number;
   rate: number;
 }
 
+export interface AnnouncementReply {
+  id: string;
+  announcementId: string;
+  authorUserId: string;
+  content: string;
+  createdAt: string;
+  /** @nullable */
+  authorName: string | null;
+  /** @nullable */
+  authorImageUrl?: string | null;
+}
+
 export interface Announcement {
-  id: number;
+  id: string;
   title: string;
   content: string;
   createdAt: string;
@@ -168,6 +176,12 @@ export interface Announcement {
   authorName: string | null;
   /** @nullable */
   authorImageUrl?: string | null;
+  replies?: AnnouncementReply[];
+}
+
+export interface AnnouncementReplyInput {
+  /** @minLength 1 */
+  content: string;
 }
 
 export interface AnnouncementInput {
@@ -216,6 +230,25 @@ export interface UploadUrlRequest {
 export interface UploadUrlResponse {
   uploadURL: string;
   objectPath: string;
+}
+
+export interface UserBadges {
+  /** @nullable */
+  mainBadge?: string | null;
+  proficiencyBadges?: string[];
+  hobbyBadges?: string[];
+}
+
+export interface BadgeAssignment {
+  badge: string;
+}
+
+export interface ProficiencyBadgesResponse {
+  proficiencyBadges?: string[];
+}
+
+export interface HobbyBadgesResponse {
+  hobbyBadges?: string[];
 }
 
 export type AuthorizationSessionHeaderParameter = string;

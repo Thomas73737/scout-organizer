@@ -39,11 +39,11 @@ app.use(authMiddleware);
 app.use("/api", router);
 
 // Serve static frontend files from the Vite build output
-const clientDistPath = path.resolve(process.cwd(), "dist");
+const clientDistPath = path.resolve(__dirname, "../../..", "dist");
 app.use(express.static(clientDistPath));
 
 // SPA fallback: serve index.html for all non-API, non-static routes
-app.get("*", (_req, res) => {
+app.get("/{*splat}", (_req, res) => {
   res.sendFile(path.join(clientDistPath, "index.html"));
 });
 

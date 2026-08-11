@@ -11,7 +11,7 @@ async function isDeveloperOrLeader(userId: string): Promise<boolean> {
     .select("role")
     .eq("userId", userId)
     .single();
-  return data?.role === "developer" || data?.role === "leader" || data?.role === "cp_of_cps";
+  return data?.role === "developer" || data?.role === "leader";
 }
 
 async function ensureProfile(userId: string) {

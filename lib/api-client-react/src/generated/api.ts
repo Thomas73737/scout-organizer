@@ -22,21 +22,27 @@ import type {
 import type {
   Announcement,
   AnnouncementInput,
+  AnnouncementReply,
+  AnnouncementReplyInput,
   AttendanceRecordsBatch,
   AttendanceSession,
   AttendanceSessionDetail,
   AttendanceSessionInput,
   AttendanceSummary,
   AuthUserEnvelope,
+  BadgeAssignment,
   BeginBrowserLoginParams,
   DeleteSuccess,
   HandleBrowserLoginCallbackParams,
   HealthStatus,
+  HobbyBadgesResponse,
   Post,
   PostInput,
+  ProficiencyBadgesResponse,
   ScoutUser,
   UploadUrlRequest,
   UploadUrlResponse,
+  UserBadges,
   UserRoleUpdate,
   UserStats
 } from './api.schemas';
@@ -692,6 +698,510 @@ export const useUpdateUserRole = <TError = ErrorType<unknown>,
       return useMutation(getUpdateUserRoleMutationOptions(options));
     }
 
+export const getGetUserBadgesUrl = (userId: string,) => {
+
+
+
+
+  return `/api/badges/${userId}`
+}
+
+/**
+ * @summary Get a user's badges (public)
+ */
+export const getUserBadges = async (userId: string, options?: RequestInit): Promise<UserBadges> => {
+
+  return customFetch<UserBadges>(getGetUserBadgesUrl(userId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetUserBadgesQueryKey = (userId: string,) => {
+    return [
+    `/api/badges/${userId}`
+    ] as const;
+    }
+
+
+export const getGetUserBadgesQueryOptions = <TData = Awaited<ReturnType<typeof getUserBadges>>, TError = ErrorType<unknown>>(userId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUserBadges>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetUserBadgesQueryKey(userId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getUserBadges>>> = ({ signal }) => getUserBadges(userId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: userId !== null && userId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getUserBadges>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetUserBadgesQueryResult = NonNullable<Awaited<ReturnType<typeof getUserBadges>>>
+export type GetUserBadgesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get a user's badges (public)
+ */
+
+export function useGetUserBadges<TData = Awaited<ReturnType<typeof getUserBadges>>, TError = ErrorType<unknown>>(
+ userId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getUserBadges>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetUserBadgesQueryOptions(userId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getSetMainBadgeUrl = (userId: string,) => {
+
+
+
+
+  return `/api/badges/${userId}/main-badge`
+}
+
+/**
+ * @summary Set a user's main badge (admin only)
+ */
+export const setMainBadge = async (userId: string,
+    badgeAssignment: BadgeAssignment, options?: RequestInit): Promise<UserBadges> => {
+
+  return customFetch<UserBadges>(getSetMainBadgeUrl(userId),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(badgeAssignment)
+  }
+);}
+
+
+
+
+export const getSetMainBadgeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setMainBadge>>, TError,{userId: string;data: BodyType<BadgeAssignment>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof setMainBadge>>, TError,{userId: string;data: BodyType<BadgeAssignment>}, TContext> => {
+
+const mutationKey = ['setMainBadge'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof setMainBadge>>, {userId: string;data: BodyType<BadgeAssignment>}> = (props) => {
+          const {userId,data} = props ?? {};
+
+          return  setMainBadge(userId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type SetMainBadgeMutationResult = NonNullable<Awaited<ReturnType<typeof setMainBadge>>>
+    export type SetMainBadgeMutationBody = BodyType<BadgeAssignment>
+    export type SetMainBadgeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Set a user's main badge (admin only)
+ */
+export const useSetMainBadge = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof setMainBadge>>, TError,{userId: string;data: BodyType<BadgeAssignment>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof setMainBadge>>,
+        TError,
+        {userId: string;data: BodyType<BadgeAssignment>},
+        TContext
+      > => {
+      return useMutation(getSetMainBadgeMutationOptions(options));
+    }
+
+export const getRemoveMainBadgeUrl = (userId: string,) => {
+
+
+
+
+  return `/api/badges/${userId}/main-badge`
+}
+
+/**
+ * @summary Remove a user's main badge (admin only)
+ */
+export const removeMainBadge = async (userId: string, options?: RequestInit): Promise<UserBadges> => {
+
+  return customFetch<UserBadges>(getRemoveMainBadgeUrl(userId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getRemoveMainBadgeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeMainBadge>>, TError,{userId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeMainBadge>>, TError,{userId: string}, TContext> => {
+
+const mutationKey = ['removeMainBadge'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeMainBadge>>, {userId: string}> = (props) => {
+          const {userId} = props ?? {};
+
+          return  removeMainBadge(userId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveMainBadgeMutationResult = NonNullable<Awaited<ReturnType<typeof removeMainBadge>>>
+
+    export type RemoveMainBadgeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Remove a user's main badge (admin only)
+ */
+export const useRemoveMainBadge = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeMainBadge>>, TError,{userId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof removeMainBadge>>,
+        TError,
+        {userId: string},
+        TContext
+      > => {
+      return useMutation(getRemoveMainBadgeMutationOptions(options));
+    }
+
+export const getAddProficiencyBadgeUrl = (userId: string,) => {
+
+
+
+
+  return `/api/badges/${userId}/proficiency`
+}
+
+/**
+ * @summary Add a proficiency badge (admin only)
+ */
+export const addProficiencyBadge = async (userId: string,
+    badgeAssignment: BadgeAssignment, options?: RequestInit): Promise<ProficiencyBadgesResponse> => {
+
+  return customFetch<ProficiencyBadgesResponse>(getAddProficiencyBadgeUrl(userId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(badgeAssignment)
+  }
+);}
+
+
+
+
+export const getAddProficiencyBadgeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addProficiencyBadge>>, TError,{userId: string;data: BodyType<BadgeAssignment>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addProficiencyBadge>>, TError,{userId: string;data: BodyType<BadgeAssignment>}, TContext> => {
+
+const mutationKey = ['addProficiencyBadge'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addProficiencyBadge>>, {userId: string;data: BodyType<BadgeAssignment>}> = (props) => {
+          const {userId,data} = props ?? {};
+
+          return  addProficiencyBadge(userId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddProficiencyBadgeMutationResult = NonNullable<Awaited<ReturnType<typeof addProficiencyBadge>>>
+    export type AddProficiencyBadgeMutationBody = BodyType<BadgeAssignment>
+    export type AddProficiencyBadgeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Add a proficiency badge (admin only)
+ */
+export const useAddProficiencyBadge = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addProficiencyBadge>>, TError,{userId: string;data: BodyType<BadgeAssignment>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addProficiencyBadge>>,
+        TError,
+        {userId: string;data: BodyType<BadgeAssignment>},
+        TContext
+      > => {
+      return useMutation(getAddProficiencyBadgeMutationOptions(options));
+    }
+
+export const getRemoveProficiencyBadgeUrl = (userId: string,
+    badgeName: string,) => {
+
+
+
+
+  return `/api/badges/${userId}/proficiency/${badgeName}`
+}
+
+/**
+ * @summary Remove a proficiency badge (admin only)
+ */
+export const removeProficiencyBadge = async (userId: string,
+    badgeName: string, options?: RequestInit): Promise<ProficiencyBadgesResponse> => {
+
+  return customFetch<ProficiencyBadgesResponse>(getRemoveProficiencyBadgeUrl(userId,badgeName),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getRemoveProficiencyBadgeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeProficiencyBadge>>, TError,{userId: string;badgeName: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeProficiencyBadge>>, TError,{userId: string;badgeName: string}, TContext> => {
+
+const mutationKey = ['removeProficiencyBadge'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeProficiencyBadge>>, {userId: string;badgeName: string}> = (props) => {
+          const {userId,badgeName} = props ?? {};
+
+          return  removeProficiencyBadge(userId,badgeName,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveProficiencyBadgeMutationResult = NonNullable<Awaited<ReturnType<typeof removeProficiencyBadge>>>
+
+    export type RemoveProficiencyBadgeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Remove a proficiency badge (admin only)
+ */
+export const useRemoveProficiencyBadge = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeProficiencyBadge>>, TError,{userId: string;badgeName: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof removeProficiencyBadge>>,
+        TError,
+        {userId: string;badgeName: string},
+        TContext
+      > => {
+      return useMutation(getRemoveProficiencyBadgeMutationOptions(options));
+    }
+
+export const getAddHobbyBadgeUrl = (userId: string,) => {
+
+
+
+
+  return `/api/badges/${userId}/hobby`
+}
+
+/**
+ * @summary Add a hobby badge (admin only)
+ */
+export const addHobbyBadge = async (userId: string,
+    badgeAssignment: BadgeAssignment, options?: RequestInit): Promise<HobbyBadgesResponse> => {
+
+  return customFetch<HobbyBadgesResponse>(getAddHobbyBadgeUrl(userId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(badgeAssignment)
+  }
+);}
+
+
+
+
+export const getAddHobbyBadgeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addHobbyBadge>>, TError,{userId: string;data: BodyType<BadgeAssignment>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof addHobbyBadge>>, TError,{userId: string;data: BodyType<BadgeAssignment>}, TContext> => {
+
+const mutationKey = ['addHobbyBadge'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof addHobbyBadge>>, {userId: string;data: BodyType<BadgeAssignment>}> = (props) => {
+          const {userId,data} = props ?? {};
+
+          return  addHobbyBadge(userId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type AddHobbyBadgeMutationResult = NonNullable<Awaited<ReturnType<typeof addHobbyBadge>>>
+    export type AddHobbyBadgeMutationBody = BodyType<BadgeAssignment>
+    export type AddHobbyBadgeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Add a hobby badge (admin only)
+ */
+export const useAddHobbyBadge = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof addHobbyBadge>>, TError,{userId: string;data: BodyType<BadgeAssignment>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof addHobbyBadge>>,
+        TError,
+        {userId: string;data: BodyType<BadgeAssignment>},
+        TContext
+      > => {
+      return useMutation(getAddHobbyBadgeMutationOptions(options));
+    }
+
+export const getRemoveHobbyBadgeUrl = (userId: string,
+    badgeName: string,) => {
+
+
+
+
+  return `/api/badges/${userId}/hobby/${badgeName}`
+}
+
+/**
+ * @summary Remove a hobby badge (admin only)
+ */
+export const removeHobbyBadge = async (userId: string,
+    badgeName: string, options?: RequestInit): Promise<HobbyBadgesResponse> => {
+
+  return customFetch<HobbyBadgesResponse>(getRemoveHobbyBadgeUrl(userId,badgeName),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getRemoveHobbyBadgeMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeHobbyBadge>>, TError,{userId: string;badgeName: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof removeHobbyBadge>>, TError,{userId: string;badgeName: string}, TContext> => {
+
+const mutationKey = ['removeHobbyBadge'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof removeHobbyBadge>>, {userId: string;badgeName: string}> = (props) => {
+          const {userId,badgeName} = props ?? {};
+
+          return  removeHobbyBadge(userId,badgeName,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type RemoveHobbyBadgeMutationResult = NonNullable<Awaited<ReturnType<typeof removeHobbyBadge>>>
+
+    export type RemoveHobbyBadgeMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Remove a hobby badge (admin only)
+ */
+export const useRemoveHobbyBadge = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof removeHobbyBadge>>, TError,{userId: string;badgeName: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof removeHobbyBadge>>,
+        TError,
+        {userId: string;badgeName: string},
+        TContext
+      > => {
+      return useMutation(getRemoveHobbyBadgeMutationOptions(options));
+    }
+
 export const getGetUserStatsUrl = () => {
 
 
@@ -1288,7 +1798,7 @@ export const useCreateAnnouncement = <TError = ErrorType<unknown>,
       return useMutation(getCreateAnnouncementMutationOptions(options));
     }
 
-export const getDeleteAnnouncementUrl = (announcementId: number,) => {
+export const getDeleteAnnouncementUrl = (announcementId: string,) => {
 
 
 
@@ -1299,7 +1809,7 @@ export const getDeleteAnnouncementUrl = (announcementId: number,) => {
 /**
  * @summary Delete an announcement (leader only)
  */
-export const deleteAnnouncement = async (announcementId: number, options?: RequestInit): Promise<DeleteSuccess> => {
+export const deleteAnnouncement = async (announcementId: string, options?: RequestInit): Promise<DeleteSuccess> => {
 
   return customFetch<DeleteSuccess>(getDeleteAnnouncementUrl(announcementId),
   {
@@ -1314,8 +1824,8 @@ export const deleteAnnouncement = async (announcementId: number, options?: Reque
 
 
 export const getDeleteAnnouncementMutationOptions = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAnnouncement>>, TError,{announcementId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
-): UseMutationOptions<Awaited<ReturnType<typeof deleteAnnouncement>>, TError,{announcementId: number}, TContext> => {
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAnnouncement>>, TError,{announcementId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteAnnouncement>>, TError,{announcementId: string}, TContext> => {
 
 const mutationKey = ['deleteAnnouncement'];
 const {mutation: mutationOptions, request: requestOptions} = options ?
@@ -1327,7 +1837,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
 
 
 
-      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAnnouncement>>, {announcementId: number}> = (props) => {
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAnnouncement>>, {announcementId: string}> = (props) => {
           const {announcementId} = props ?? {};
 
           return  deleteAnnouncement(announcementId,requestOptions)
@@ -1348,14 +1858,234 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
  * @summary Delete an announcement (leader only)
  */
 export const useDeleteAnnouncement = <TError = ErrorType<unknown>,
-    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAnnouncement>>, TError,{announcementId: number}, TContext>, request?: SecondParameter<typeof customFetch>}
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAnnouncement>>, TError,{announcementId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
  ): UseMutationResult<
         Awaited<ReturnType<typeof deleteAnnouncement>>,
         TError,
-        {announcementId: number},
+        {announcementId: string},
         TContext
       > => {
       return useMutation(getDeleteAnnouncementMutationOptions(options));
+    }
+
+export const getListAnnouncementRepliesUrl = (announcementId: string,) => {
+
+
+
+
+  return `/api/announcements/${announcementId}/replies`
+}
+
+/**
+ * @summary List replies for an announcement (any authenticated user)
+ */
+export const listAnnouncementReplies = async (announcementId: string, options?: RequestInit): Promise<AnnouncementReply[]> => {
+
+  return customFetch<AnnouncementReply[]>(getListAnnouncementRepliesUrl(announcementId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAnnouncementRepliesQueryKey = (announcementId: string,) => {
+    return [
+    `/api/announcements/${announcementId}/replies`
+    ] as const;
+    }
+
+
+export const getListAnnouncementRepliesQueryOptions = <TData = Awaited<ReturnType<typeof listAnnouncementReplies>>, TError = ErrorType<unknown>>(announcementId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAnnouncementReplies>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAnnouncementRepliesQueryKey(announcementId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAnnouncementReplies>>> = ({ signal }) => listAnnouncementReplies(announcementId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: announcementId !== null && announcementId !== undefined, ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAnnouncementReplies>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAnnouncementRepliesQueryResult = NonNullable<Awaited<ReturnType<typeof listAnnouncementReplies>>>
+export type ListAnnouncementRepliesQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List replies for an announcement (any authenticated user)
+ */
+
+export function useListAnnouncementReplies<TData = Awaited<ReturnType<typeof listAnnouncementReplies>>, TError = ErrorType<unknown>>(
+ announcementId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAnnouncementReplies>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAnnouncementRepliesQueryOptions(announcementId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+
+
+
+
+
+
+export const getCreateAnnouncementReplyUrl = (announcementId: string,) => {
+
+
+
+
+  return `/api/announcements/${announcementId}/replies`
+}
+
+/**
+ * @summary Reply to an announcement (any authenticated user)
+ */
+export const createAnnouncementReply = async (announcementId: string,
+    announcementReplyInput: AnnouncementReplyInput, options?: RequestInit): Promise<AnnouncementReply> => {
+
+  return customFetch<AnnouncementReply>(getCreateAnnouncementReplyUrl(announcementId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(announcementReplyInput)
+  }
+);}
+
+
+
+
+export const getCreateAnnouncementReplyMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAnnouncementReply>>, TError,{announcementId: string;data: BodyType<AnnouncementReplyInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof createAnnouncementReply>>, TError,{announcementId: string;data: BodyType<AnnouncementReplyInput>}, TContext> => {
+
+const mutationKey = ['createAnnouncementReply'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof createAnnouncementReply>>, {announcementId: string;data: BodyType<AnnouncementReplyInput>}> = (props) => {
+          const {announcementId,data} = props ?? {};
+
+          return  createAnnouncementReply(announcementId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type CreateAnnouncementReplyMutationResult = NonNullable<Awaited<ReturnType<typeof createAnnouncementReply>>>
+    export type CreateAnnouncementReplyMutationBody = BodyType<AnnouncementReplyInput>
+    export type CreateAnnouncementReplyMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Reply to an announcement (any authenticated user)
+ */
+export const useCreateAnnouncementReply = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createAnnouncementReply>>, TError,{announcementId: string;data: BodyType<AnnouncementReplyInput>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof createAnnouncementReply>>,
+        TError,
+        {announcementId: string;data: BodyType<AnnouncementReplyInput>},
+        TContext
+      > => {
+      return useMutation(getCreateAnnouncementReplyMutationOptions(options));
+    }
+
+export const getDeleteAnnouncementReplyUrl = (announcementId: string,
+    replyId: string,) => {
+
+
+
+
+  return `/api/announcements/${announcementId}/replies/${replyId}`
+}
+
+/**
+ * @summary Delete a reply (author can delete own; leader can delete any)
+ */
+export const deleteAnnouncementReply = async (announcementId: string,
+    replyId: string, options?: RequestInit): Promise<DeleteSuccess> => {
+
+  return customFetch<DeleteSuccess>(getDeleteAnnouncementReplyUrl(announcementId,replyId),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+
+export const getDeleteAnnouncementReplyMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAnnouncementReply>>, TError,{announcementId: string;replyId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof deleteAnnouncementReply>>, TError,{announcementId: string;replyId: string}, TContext> => {
+
+const mutationKey = ['deleteAnnouncementReply'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof deleteAnnouncementReply>>, {announcementId: string;replyId: string}> = (props) => {
+          const {announcementId,replyId} = props ?? {};
+
+          return  deleteAnnouncementReply(announcementId,replyId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type DeleteAnnouncementReplyMutationResult = NonNullable<Awaited<ReturnType<typeof deleteAnnouncementReply>>>
+
+    export type DeleteAnnouncementReplyMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Delete a reply (author can delete own; leader can delete any)
+ */
+export const useDeleteAnnouncementReply = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deleteAnnouncementReply>>, TError,{announcementId: string;replyId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof deleteAnnouncementReply>>,
+        TError,
+        {announcementId: string;replyId: string},
+        TContext
+      > => {
+      return useMutation(getDeleteAnnouncementReplyMutationOptions(options));
     }
 
 export const getListPostsUrl = () => {

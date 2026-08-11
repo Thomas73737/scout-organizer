@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useListUsers, useUpdateUserRole, getListUsersQueryKey, useGetMyProfile } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Shield, Users, Trash2, Download, Eye, Award, Plus, Loader2, Medal, Star } from "lucide-react";
+import { Shield, Users, Trash2, Download, Eye, Award, Plus, Loader2, Medal, Star, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import {
@@ -39,6 +39,7 @@ export default function Admin() {
   const { toast } = useToast();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
+  const [memberSearch, setMemberSearch] = useState("");
 
   const updatePatrolMutation = useMutation({
     mutationFn: async ({ userId, patrol }: { userId: string; patrol: string }) => {
@@ -150,6 +151,13 @@ export default function Admin() {
   const [pointsAmount, setPointsAmount] = useState("");
   const [pointsReason, setPointsReason] = useState("");
   const [awardingPoints, setAwardingPoints] = useState(false);
+
+  // Deduct points state
+  const [selectedScoutForDeduction, setSelectedScoutForDeduction] = useState("");
+  const [deductPointsAmount, setDeductPointsAmount] = useState("");
+  const [deductPointsReason, setDeductPointsReason] = useState("");
+  const [deductingPoints, setDeductingPoints] = useState(false);
+  const [deductAllPoints, setDeductAllPoints] = useState(false);
 
   // Badge management state
   const [badgeDialogOpen, setBadgeDialogOpen] = useState(false);
@@ -272,17 +280,74 @@ export default function Admin() {
     setAwardingPoints(false);
   };
 
+  const handleDeductPoints = async () => {
+    if (!selectedScoutForDeduction) return;
+    if (!deductAllPoints && (!deductPointsAmount || !deductPointsReason)) return;
+    setDeductingPoints(true);
+    try {
+      if (deductAllPoints) {
+        const res = await fetch(`/api/points/user/${selectedScoutForDeduction}/all`, {
+          method: "DELETE",
+          credentials: "include",
+        });
+        if (res.ok) {
+          toast({ title: "All points removed from scout" });
+          setSelectedScoutForDeduction("");
+          setDeductAllPoints(false);
+        } else {
+          toast({ title: "Failed to remove points", variant: "destructive" });
+        }
+      } else {
+        const res = await fetch("/api/points/award", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            userId: selectedScoutForDeduction,
+            points: -parseInt(deductPointsAmount),
+            reason: deductPointsReason,
+          }),
+        });
+        if (res.ok) {
+          toast({ title: `Deducted ${deductPointsAmount} points from scout` });
+          setSelectedScoutForDeduction("");
+          setDeductPointsAmount("");
+          setDeductPointsReason("");
+        } else {
+          toast({ title: "Failed to deduct points", variant: "destructive" });
+        }
+      }
+    } catch {
+      toast({ title: "Failed to deduct points", variant: "destructive" });
+    }
+    setDeductingPoints(false);
+  };
+
   const getInitials = (first: string | null, last: string | null) => {
     return `${first?.[0] ?? ""}${last?.[0] ?? ""}`.toUpperCase() || "?";
   };
 
   const scouts = users?.filter((u) => u.role === "scout") ?? [];
+  const pointEligibleScouts = users?.filter((u) => u.role === "scout" || u.role === "cp" || u.role === "cp_of_cps") ?? [];
   const cpUsers = users?.filter((u) => u.role === "cp") ?? [];
   const cpOfCpsUsers = users?.filter((u) => u.role === "cp_of_cps") ?? [];
   const leaders = users?.filter((u) => u.role === "leader") ?? [];
   const developers = users?.filter((u) => u.role === "developer") ?? [];
   const patrols = ["صقر", "فهد", "ثعلب", "ذئب", "نمر", "نسر", "أسد", "غراب", "بلبل", "ديك", "خفاش", "غزال"];
-  const isDeveloper = currentUser?.role === "developer" || currentUser?.role === "leader" || currentUser?.role === "cp_of_cps";
+  const isDeveloper = currentUser?.role === "developer" || currentUser?.role === "leader" ;
+
+  const filteredMembers = useMemo(() => {
+    const query = memberSearch.trim().toLowerCase();
+    if (!query) return users ?? [];
+    return (users ?? []).filter((u) => {
+      const name = `${u.firstName ?? ""} ${u.lastName ?? ""}`.toLowerCase();
+      return (
+        name.includes(query) ||
+        (u.email ?? "").toLowerCase().includes(query) ||
+        (u.patrol ?? "").toLowerCase().includes(query)
+      );
+    });
+  }, [users, memberSearch]);
 
   const handleExportData = async () => {
     try {
@@ -339,7 +404,7 @@ export default function Admin() {
             <Shield className="h-5 w-5 text-teal-500" />
             <div>
               <p className="text-2xl font-bold">{cpUsers.length}</p>
-              <p className="text-xs text-muted-foreground">CP / كوربال</p>
+              <p className="text-xs text-muted-foreground">CP</p>
             </div>
           </CardContent>
         </Card>
@@ -348,7 +413,7 @@ export default function Admin() {
             <Shield className="h-5 w-5 text-orange-500" />
             <div>
               <p className="text-2xl font-bold">{cpOfCpsUsers.length}</p>
-              <p className="text-xs text-muted-foreground">CP of CPs / قائد كوربال</p>
+              <p className="text-xs text-muted-foreground">CP of CPs</p>
             </div>
           </CardContent>
         </Card>
@@ -548,7 +613,7 @@ export default function Admin() {
                   <SelectValue placeholder="Choose a scout..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {scouts.map((s) => (
+                  {pointEligibleScouts.map((s) => (
                     <SelectItem key={s.replitId} value={s.replitId}>
                       {s.firstName} {s.lastName}
                     </SelectItem>
@@ -589,6 +654,77 @@ export default function Admin() {
 
       <Card>
         <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Award className="h-4 w-4 text-red-500" />
+            Remove Points / حذف النقاط
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Select Scout / اختر الكشاف</label>
+              <Select
+                value={selectedScoutForDeduction}
+                onValueChange={setSelectedScoutForDeduction}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Choose a scout..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {pointEligibleScouts.map((s) => (
+                    <SelectItem key={s.replitId} value={s.replitId}>
+                      {s.firstName} {s.lastName}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="deductAll"
+                checked={deductAllPoints}
+                onChange={(e) => setDeductAllPoints(e.target.checked)}
+                className="rounded border-border"
+              />
+              <label htmlFor="deductAll" className="text-sm font-medium">Remove all points / حذف جميع النقاط</label>
+            </div>
+            {!deductAllPoints && (
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="text-sm font-medium">Points / النقاط</label>
+                  <Input
+                    type="number"
+                    value={deductPointsAmount}
+                    onChange={(e) => setDeductPointsAmount(e.target.value)}
+                    placeholder="e.g. 10"
+                  />
+                </div>
+                <div className="flex-1">
+                  <label className="text-sm font-medium">Reason / السبب</label>
+                  <Input
+                    value={deductPointsReason}
+                    onChange={(e) => setDeductPointsReason(e.target.value)}
+                    placeholder="e.g. Misconduct"
+                  />
+                </div>
+              </div>
+            )}
+            <Button
+              onClick={handleDeductPoints}
+              disabled={!selectedScoutForDeduction || (!deductAllPoints && (!deductPointsAmount || !deductPointsReason)) || deductingPoints}
+              className="w-full"
+              variant="destructive"
+            >
+              {deductingPoints ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              {deductAllPoints ? "Remove All Points / حذف جميع النقاط" : "Deduct Points / خصم النقاط"}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle className="text-base">All Members / جميع الأعضاء</CardTitle>
         </CardHeader>
         <CardContent>
@@ -596,11 +732,29 @@ export default function Admin() {
             <div className="space-y-3">
               {[1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-16 w-full" />)}
             </div>
-          ) : users?.length === 0 ? (
-            <p className="text-muted-foreground text-sm text-center py-6">No members yet</p>
           ) : (
-            <div className="divide-y divide-border">
-              {users?.map((user) => (
+            <>
+              <div className="mb-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={memberSearch}
+                    onChange={(e) => setMemberSearch(e.target.value)}
+                    placeholder="Search members by name, email, or patrol... / ابحث عن الأعضاء..."
+                    className="pl-9"
+                    data-testid="input-admin-member-search"
+                  />
+                </div>
+              </div>
+              {filteredMembers.length === 0 ? (
+                <p className="text-muted-foreground text-sm text-center py-6">
+                  {memberSearch.trim()
+                    ? `No members match "${memberSearch.trim()}" / لا يوجد أعضاء مطابقون`
+                    : "No members yet"}
+                </p>
+              ) : (
+                <div className="divide-y divide-border">
+                  {filteredMembers.map((user) => (
                 <div key={user.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-3 gap-2" data-testid={`user-row-${user.id}`}>
                   <div className="flex items-center gap-3 min-w-0">
                     <Avatar className="h-9 w-9 shrink-0">
@@ -631,8 +785,8 @@ export default function Admin() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="scout">Scout / كشاف</SelectItem>
-                        <SelectItem value="cp">CP / كوربال</SelectItem>
-                        <SelectItem value="cp_of_cps">CP of CPs / قائد كوربال</SelectItem>
+                        <SelectItem value="cp">CP</SelectItem>
+                        <SelectItem value="cp_of_cps">CP of CPs</SelectItem>
                         <SelectItem value="leader">Leader / قائد</SelectItem>
                         <SelectItem value="developer">Developer / مطور</SelectItem>
                       </SelectContent>
@@ -703,7 +857,9 @@ export default function Admin() {
                   </div>
                 </div>
               ))}
-            </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

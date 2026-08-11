@@ -5,16 +5,15 @@
  * San George Scouts API
  * OpenAPI spec version: 0.1.0
  */
-import type { AnnouncementReply } from './announcementReply';
 
-export interface Announcement {
+export interface AnnouncementReply {
   id: string;
-  title: string;
+  announcementId: string;
+  authorUserId: string;
   content: string;
   createdAt: Date;
   /** @nullable */
   authorName: string | null;
   /** @nullable */
   authorImageUrl?: string | null;
-  replies?: AnnouncementReply[];
 }
