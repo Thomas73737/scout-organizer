@@ -2,12 +2,13 @@
   "name": "workspace",
   "version": "0.0.0",
   "license": "MIT",
-  "packageManager": "pnpm@11.13.0",
+  "packageManager": "pnpm@11.28.2",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
     "build": "pnpm --filter @workspace/api-server run build && pnpm --filter @workspace/scouts-web run build",
+    "build:vercel-api": "node scripts/build-vercel-api.mjs",
     "start": "pnpm --filter @workspace/api-server run start",
     "typecheck:libs": "tsc --build",
     "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",

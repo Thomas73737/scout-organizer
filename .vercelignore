@@ -1,0 +1,47 @@
+# Vercel uses this file in place of .gitignore when uploading a deployment, so
+# everything .gitignore excludes must be repeated here. Keeping the two in sync
+# matters: .env holds SUPABASE_SERVICE_KEY and VAPID_PRIVATE_KEY, and
+# db-backup/ can hold database dumps.
+#
+# Path note: patterns are anchored with a leading slash where they only apply to
+# the repo root. An unanchored "public/" would also match
+# artifacts/scouts-web/public, which is Vite's publicDir and holds the site's
+# images and videos -- those MUST be uploaded or the build loses them.
+
+# --- mirrors of .gitignore ---
+node_modules
+dist
+tmp
+out-tsc
+*.tsbuildinfo
+.expo
+.expo-shared
+/coverage
+/local-storage
+/db-backup
+.env
+.env.local
+.env.*.local
+.git
+.vercel
+.DS_Store
+Thumbs.db
+.cache
+.local
+*.log
+
+# --- generated locally, rebuilt on Vercel ---
+# api/_app.mjs is produced by scripts/build-vercel-api.mjs during the build
+# command, and api/_app.mjs.map when source maps are enabled.
+/api/_app.mjs
+/api/_app.mjs.map
+
+# --- source media that is duplicated in artifacts/scouts-web/public/ ---
+# The originals live at the repo root and are byte-for-byte copies of what Vite
+# already copies into dist/. Excluding them cuts ~25MB per upload.
+/big wow/
+/capms-pic/
+/final ceremony/
+/heart smile/
+/qr-pics/
+/scoutPic/

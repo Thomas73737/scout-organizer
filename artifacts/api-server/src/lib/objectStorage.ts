@@ -28,7 +28,14 @@ const MAGIC_BYTES_MAP: Array<{ bytes: number[]; offset: number; mime: string }> 
 
 const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
 const GCS_SIGNING_PATH = "/gcs/sign-url";
-const IS_LOCAL_DEV = !process.env.REPLIT_DEPLOYMENT;
+// Replit sets REPLIT_DEPLOYMENT on hosted apps, Vercel sets VERCEL=1. Anything
+// that is neither is a local `pnpm dev` run, which is the only case where the
+// on-disk local-storage/ fallback makes sense. Treating "not Replit" as "local"
+// is what previously broke the function: a Vercel function's filesystem is
+// read-only apart from /tmp, so the mkdirSync below threw ENOENT while the
+// module was still being imported and every /api request 500'd.
+const IS_VERCEL = process.env.VERCEL === "1";
+const IS_LOCAL_DEV = !process.env.REPLIT_DEPLOYMENT && !IS_VERCEL;
 
 // Local storage directory for development
 const LOCAL_STORAGE_DIR = path.join(process.cwd(), "local-storage");
@@ -44,7 +51,10 @@ if (IS_LOCAL_DEV) {
   }
 }
 
-export const objectStorageClient = IS_LOCAL_DEV ? null : new Storage({
+// The Replit object storage backend authenticates against the Replit sidecar at
+// 127.0.0.1:1106, which only exists on Replit. Leave it null elsewhere so the
+// Replit code paths fail loudly instead of hanging on a dead socket.
+export const objectStorageClient = IS_LOCAL_DEV || IS_VERCEL ? null : new Storage({
   credentials: {
     audience: "replit",
     subject_token_type: "access_token",
