@@ -10,6 +10,7 @@ import {
   getObjectAclPolicy,
   setObjectAclPolicy,
 } from "./objectAcl";
+import { ObjectNotFoundError } from "./objectStorageError";
 
 const MAGIC_BYTES_MAP: Array<{ bytes: number[]; offset: number; mime: string }> = [
   { bytes: [0xFF, 0xD8, 0xFF], offset: 0, mime: "image/jpeg" },
@@ -61,13 +62,7 @@ export const objectStorageClient = IS_LOCAL_DEV ? null : new Storage({
   projectId: "",
 });
 
-export class ObjectNotFoundError extends Error {
-  constructor() {
-    super("Object not found");
-    this.name = "ObjectNotFoundError";
-    Object.setPrototypeOf(this, ObjectNotFoundError.prototype);
-  }
-}
+export { ObjectNotFoundError } from "./objectStorageError";
 
 export class ObjectStorageService {
   constructor() {}

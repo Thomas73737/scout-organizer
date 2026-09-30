@@ -51,8 +51,11 @@ Thumbs.db
 # Local storage for development
 local-storage/
 
-# Vercel build output (legacy)
-public/
+# Vercel build output (legacy).
+# Anchored to the repo root on purpose: an unanchored "public/" also matches
+# artifacts/scouts-web/public, which is Vite's publicDir and holds the site's
+# images and videos. Ignoring it silently strips them from the build.
+#/public/
 
 # Environment variables
 .env

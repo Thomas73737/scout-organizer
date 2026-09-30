@@ -6,7 +6,7 @@ import {
   RequestUploadUrlBody,
   RequestUploadUrlResponse,
 } from "@workspace/api-zod";
-import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
+import { ObjectStorageService, ObjectNotFoundError } from "../lib/storageService";
 import { ObjectPermission } from "../lib/objectAcl";
 
 const router: IRouter = Router();
@@ -15,7 +15,88 @@ const objectStorageService = new ObjectStorageService();
 // Local storage directory for development
 const LOCAL_STORAGE_DIR = path.join(process.cwd(), "local-storage");
 const LOCAL_UPLOADS_DIR = path.join(LOCAL_STORAGE_DIR, "uploads");
-const IS_LOCAL_DEV = !process.env.REPLIT_DEPLOYMENT;
+
+/**
+ * PUT /storage/upload/:objectId
+ * PUT /storage/local-upload/:objectId
+ *
+ * Receives the raw file body and persists it.
+ *
+ * On the Supabase storage driver the bytes are forwarded to a private
+ * Supabase Storage bucket: serverless hosts have no writable, durable
+ * filesystem, and proxying through the API keeps the service-role key and any
+ * Supabase CORS configuration out of the browser. Local development still
+ * writes to disk.
+ */
+const uploadHandler = async (req: Request, res: ExpressResponse) => {
+  const objectId = req.params.objectId;
+  const fileName = req.query.filename as string | undefined;
+
+  if (objectStorageService.usesSupabaseDriver) {
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as string));
+    }
+    const body = Buffer.concat(chunks);
+
+    if (body.length === 0) {
+      res.status(400).json({ error: "No file data received" });
+      return;
+    }
+
+    try {
+      await objectStorageService.putPrivateObject(
+        `uploads/${objectId}`,
+        body,
+        req.headers["content-type"],
+        fileName,
+      );
+      res.json({ success: true, objectPath: `/objects/uploads/${objectId}` });
+    } catch (error) {
+      req.log.error({ err: error }, "Error uploading file to Supabase Storage");
+      res.status(500).json({ error: "Failed to upload file" });
+    }
+    return;
+  }
+
+  try {
+    const filePath = path.join(LOCAL_UPLOADS_DIR, objectId as string);
+
+    // Ensure directory exists
+    if (!fs.existsSync(LOCAL_UPLOADS_DIR)) {
+      fs.mkdirSync(LOCAL_UPLOADS_DIR, { recursive: true });
+    }
+
+    // Save file
+    const fileStream = fs.createWriteStream(filePath);
+    req.pipe(fileStream);
+
+    fileStream.on('finish', () => {
+      // Save original filename as sidecar metadata
+      if (fileName) {
+        try {
+          fs.writeFileSync(filePath + '.meta', JSON.stringify({ originalName: fileName }), 'utf-8');
+        } catch (metaErr) {
+          req.log.error({ err: metaErr }, "Error saving file metadata");
+        }
+      }
+      res.json({ success: true, objectPath: `/objects/uploads/${objectId}` });
+    });
+
+    fileStream.on('error', (error) => {
+      req.log.error({ err: error }, "Error saving file");
+      res.status(500).json({ error: "Failed to save file" });
+    });
+  } catch (error) {
+    req.log.error({ err: error }, "Error in local upload");
+    res.status(500).json({ error: "Failed to upload file" });
+  }
+};
+
+router.put("/storage/upload/:objectId", uploadHandler);
+
+// Legacy alias kept for clients pinned to the original local-dev URL.
+router.put("/storage/local-upload/:objectId", uploadHandler);
 
 /**
  * POST /storage/uploads/request-url
@@ -47,54 +128,6 @@ router.post("/storage/uploads/request-url", async (req: Request, res: ExpressRes
   } catch (error) {
     req.log.error({ err: error }, "Error generating upload URL");
     res.status(500).json({ error: "Failed to generate upload URL" });
-  }
-});
-
-/**
- * PUT /storage/local-upload/:objectId
- *
- * Local development file upload endpoint.
- * This is used when running locally without Replit's object storage.
- */
-router.put("/storage/local-upload/:objectId", async (req: Request, res: ExpressResponse) => {
-  if (!IS_LOCAL_DEV) {
-    res.status(403).json({ error: "Local upload only available in development" });
-    return;
-  }
-
-  try {
-    const objectId = req.params.objectId;
-    const filePath = path.join(LOCAL_UPLOADS_DIR, objectId as string);
-    const fileName = req.query.filename as string | undefined;
-
-    // Ensure directory exists
-    if (!fs.existsSync(LOCAL_UPLOADS_DIR)) {
-      fs.mkdirSync(LOCAL_UPLOADS_DIR, { recursive: true });
-    }
-
-    // Save file
-    const fileStream = fs.createWriteStream(filePath);
-    req.pipe(fileStream);
-
-    fileStream.on('finish', () => {
-      // Save original filename as sidecar metadata
-      if (fileName) {
-        try {
-          fs.writeFileSync(filePath + '.meta', JSON.stringify({ originalName: fileName }), 'utf-8');
-        } catch (metaErr) {
-          req.log.error({ err: metaErr }, "Error saving file metadata");
-        }
-      }
-      res.json({ success: true, objectPath: `/objects/uploads/${objectId}` });
-    });
-
-    fileStream.on('error', (error) => {
-      req.log.error({ err: error }, "Error saving file");
-      res.status(500).json({ error: "Failed to save file" });
-    });
-  } catch (error) {
-    req.log.error({ err: error }, "Error in local upload");
-    res.status(500).json({ error: "Failed to upload file" });
   }
 });
 

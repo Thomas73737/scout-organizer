@@ -14,6 +14,7 @@ import {
   SESSION_COOKIE,
   SESSION_TTL,
   ISSUER_URL,
+  OIDC_ENABLED,
   type SessionData,
 } from "../lib/auth";
 
@@ -166,6 +167,14 @@ router.get("/auth/user", async (req: Request, res: Response) => {
 });
 
 router.get("/login", async (req: Request, res: Response) => {
+  if (!OIDC_ENABLED) {
+    res.status(503).json({
+      error:
+        "OIDC login is not enabled on this deployment. Use the email and password login instead.",
+    });
+    return;
+  }
+
   const config = await getOidcConfig();
   const callbackUrl = `${getOrigin(req)}/api/callback`;
 
@@ -197,6 +206,11 @@ router.get("/login", async (req: Request, res: Response) => {
 // Query params are not validated because the OIDC provider may include
 // parameters not expressed in the schema.
 router.get("/callback", async (req: Request, res: Response) => {
+  if (!OIDC_ENABLED) {
+    res.status(503).json({ error: "OIDC login is not enabled on this deployment." });
+    return;
+  }
+
   const config = await getOidcConfig();
   const callbackUrl = `${getOrigin(req)}/api/callback`;
 
@@ -267,7 +281,7 @@ router.get("/logout", async (req: Request, res: Response) => {
   await clearSession(res, sid);
 
   // If using OIDC, do the full logout flow
-  if (process.env.REPL_ID) {
+  if (OIDC_ENABLED) {
     try {
       const config = await getOidcConfig();
       const origin = getOrigin(req);

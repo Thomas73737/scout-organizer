@@ -4,7 +4,7 @@ import { supabase } from "@workspace/db";
 import { UpdateUserRoleBody } from "@workspace/api-zod";
 import { createSession } from "../lib/auth";
 import { hashPassword, verifyPassword } from "../lib/password";
-import { ObjectStorageService, ObjectNotFoundError } from "../lib/objectStorage";
+import { ObjectStorageService, ObjectNotFoundError } from "../lib/storageService";
 import express from "express";
 import * as path from "path";
 import * as fs from "fs";
@@ -144,16 +144,18 @@ router.post("/users/me/profile-image/upload",
     const objectId = randomUUID();
     const fileName = `${objectId}${ext}`;
 
-    const storageDir = path.join(process.cwd(), "local-storage", "uploads");
-    if (!fs.existsSync(storageDir)) {
-      fs.mkdirSync(storageDir, { recursive: true });
-    }
-    const filePath = path.join(storageDir, fileName);
-    fs.writeFileSync(filePath, buffer);
-
     try {
-      fs.writeFileSync(filePath + '.meta', JSON.stringify({ originalName: `profile${ext}` }), 'utf-8');
-    } catch {}
+      await objectStorage.putPrivateObject(
+        `uploads/${fileName}`,
+        buffer,
+        contentType,
+        `profile${ext}`,
+      );
+    } catch (storageErr: any) {
+      console.error("Failed to store profile image:", storageErr?.message ?? storageErr);
+      res.status(500).json({ error: "Failed to upload profile image" });
+      return;
+    }
 
     const imageUrl = `/api/storage/objects/uploads/${fileName}`;
 
@@ -587,8 +589,34 @@ router.post("/users/login", async (req, res) => {
   }
 });
 
-// Temporary endpoint to create admin account (REMOVE IN PRODUCTION)
+/**
+ * Bootstrap endpoint for creating the very first admin account.
+ *
+ * This used to be completely unauthenticated, which is fine on localhost but
+ * means anyone on the internet could mint themselves a leader account on a
+ * public deployment. It is now disabled in production unless an
+ * ADMIN_SETUP_TOKEN is configured, and the token must then be presented in the
+ * x-admin-setup-token header.
+ */
 router.post("/users/create-admin", async (req, res) => {
+  const setupToken = process.env.ADMIN_SETUP_TOKEN;
+
+  if (!setupToken) {
+    if (process.env.NODE_ENV === "production") {
+      res.status(403).json({
+        error:
+          "Admin bootstrap is disabled. Set ADMIN_SETUP_TOKEN to enable it.",
+      });
+      return;
+    }
+  } else {
+    const provided = req.headers["x-admin-setup-token"];
+    if (provided !== setupToken) {
+      res.status(403).json({ error: "Invalid or missing admin setup token" });
+      return;
+    }
+  }
+
   const { name, email, password } = req.body as {
     name?: string;
     email?: string;

@@ -8,6 +8,16 @@ export const ISSUER_URL = process.env.ISSUER_URL ?? "https://replit.com/oidc";
 export const SESSION_COOKIE = "sid";
 export const SESSION_TTL = 7 * 24 * 60 * 60 * 1000;
 
+/**
+ * OIDC login is optional. The app's primary sign-in path is the email/password
+ * form at POST /api/users/login, which needs no identity provider. OIDC is only
+ * used by the /api/login and /api/callback redirect routes, so deployments that
+ * do not set a client id (e.g. Vercel) simply run without it.
+ */
+export const OIDC_ENABLED = Boolean(
+  process.env.REPL_ID && process.env.ISSUER_URL !== undefined,
+);
+
 export interface SessionData {
   user: AuthUser;
   access_token: string;
@@ -19,9 +29,15 @@ let oidcConfig: client.Configuration | null = null;
 
 export async function getOidcConfig(): Promise<client.Configuration> {
   if (!oidcConfig) {
+    const clientId = process.env.REPL_ID;
+    if (!clientId) {
+      throw new Error(
+        "OIDC is not configured: set REPL_ID (client id) and ISSUER_URL to enable OIDC login.",
+      );
+    }
     oidcConfig = await client.discovery(
       new URL(ISSUER_URL),
-      process.env.REPL_ID!,
+      clientId,
     );
   }
   return oidcConfig;
